@@ -752,12 +752,21 @@ async function runSearch(){
   let data; try{data=await load(S.ver)}catch(e){info.textContent="Hindi makuha ang Bibliya. Paki-check ang internet.";return}
   let html="";
   const ref=parseRef(q);
+  // 2026-11-20: a reference with a number ("2 Juan 1", "Roma 8") is not also a word search
+  // (it used to list every verse with "juan"), and a chapter/verse that does not exist gets a message.
+  const isRef = !!ref && /\d/.test(q);
+  let refMsg="";
+  if(isRef && data[ref.b]){
+    const chs=data[ref.b].length, vs=data[ref.b][ref.c-1];
+    if(!vs) refMsg=`Walang ${bookName(ref.b)} ${ref.c}. Hanggang kabanata ${chs} lang ang ${bookName(ref.b)}.`;
+    else if(ref.v>vs.length) refMsg=`Walang ${refStr(ref.b,ref.c,ref.v)}. Hanggang talata ${vs.length} lang ang ${refStr(ref.b,ref.c)}.`;
+  }
   if(ref && data[ref.b] && data[ref.b][ref.c-1] && (!ref.v || ref.v<=data[ref.b][ref.c-1].length)){
     const w=Math.min(ref.w||ref.v,data[ref.b][ref.c-1].length);
     const t= ref.v? verseText(data,ref.b,ref.c,ref.v,w) : data[ref.b][ref.c-1].slice(0,2).join(" ")+" …";
     html += `<button class="res" data-go="${ref.b}.${ref.c}.${ref.v}"><div class="ref">Pumunta sa ${esc(refStr(ref.b,ref.c,ref.v,w))} ›</div><div class="t">${esc(t)}</div></button>`;
   }
-  const words=fold(q).replace(/-/g,"").split(/\s+/).filter(w=>w.length>1);
+  const words=isRef? [] : fold(q).replace(/-/g,"").split(/\s+/).filter(w=>w.length>1);
   const pat=w=>w.split("").map(ch=>ch.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("-?");
   const wres=words.map(w=>new RegExp(pat(w)));
   let count=0; const MAX=300; const hits=[];
@@ -777,7 +786,7 @@ async function runSearch(){
     ranges.forEach(([s,e])=>{res+=esc(t.slice(last,s))+"<mark>"+esc(t.slice(s,e))+"</mark>";last=e}); return res+esc(t.slice(last));
   };
   html += hits.map(([b,c,v,t])=>`<button class="res" data-go="${b}.${c}.${v}"><div class="ref">${esc(refStr(b,c,v))}</div><div class="t">${mark(t)}</div></button>`).join("");
-  info.textContent = words.length ? (count? `${count.toLocaleString()} talata ang may "${q}"`+(count>MAX?` (ipinapakita ang unang ${MAX})`:"") : (ref?"":`Walang nakitang talata na may "${q}". Subukan ang ibang salita o ibang bersiyon.`)) : "";
+  info.textContent = words.length ? (count? `${count.toLocaleString()} talata ang may "${q}"`+(count>MAX?` (ipinapakita ang unang ${MAX})`:"") : (ref?"":`Walang nakitang talata na may "${q}". Subukan ang ibang salita o ibang bersiyon.`)) : refMsg;
   out.innerHTML=html;
 }
 document.addEventListener("click",e=>{const r=e.target.closest("[data-go]"); if(!r) return; const [b,c,v]=r.dataset.go.split(".").map(Number); openAt(b,c,v)});
