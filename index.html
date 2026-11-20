@@ -172,6 +172,92 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
 .danger{background:none;border:1px solid #b5483b;color:#b5483b;border-radius:12px;padding:10px 14px;font-weight:600}
 @media (prefers-reduced-motion: no-preference){.sheet.on{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}}
 </style>
+<style id="authentic-print">
+/* 2026-11-20 — "Printed Bible" redesign: papel ng Bibliya, itim na tinta, pulang rubrika, leather + gilt na top bar.
+   Gentium Book Plus: gawa ng SIL para sa mga Bible translator. */
+@font-face{font-family:"Gentium Book Plus";src:url("fonts/gentium-book-plus-latin-400-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"Gentium Book Plus";src:url("fonts/gentium-book-plus-latin-400-italic.woff2") format("woff2");font-weight:400;font-style:italic;font-display:swap}
+@font-face{font-family:"Gentium Book Plus";src:url("fonts/gentium-book-plus-latin-700-normal.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap}
+:root{
+  --paper:#f2ede3; --surface:#f8f5ee; --ink:#26211c; --muted:#786d60; --line:#ddd3c2;
+  --rubric:#9a2a1f; --leather:#3b251b; --gilt:#c09a52;
+  --accent:#9a2a1f; --accent-ink:#fbf7ef; --accent-soft:#ece3d3;
+  --hl-y:#f1df92; --hl-g:#d3e0b5; --hl-b:#cbdbe6; --hl-p:#efcdc8;
+  --font-display:"Gentium Book Plus","Literata",Georgia,serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#1b1613; --surface:#231d19; --ink:#ebe2d3; --muted:#a39684; --line:#3a3029;
+    --rubric:#e08a72; --leather:#120d0b; --gilt:#cfae69;
+    --accent:#e08a72; --accent-ink:#1b1613; --accent-soft:#33281f;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#1b1613; --surface:#231d19; --ink:#ebe2d3; --muted:#a39684; --line:#3a3029;
+  --rubric:#e08a72; --leather:#120d0b; --gilt:#cfae69;
+  --accent:#e08a72; --accent-ink:#1b1613; --accent-soft:#33281f;
+}
+
+/* Top bar = pabalat na leather, gilt na titik at gilid */
+.top{background:var(--leather);border-bottom:3px double var(--gilt);color:var(--gilt)}
+.top .title{color:var(--gilt);font-weight:400;letter-spacing:.04em;font-variant:small-caps;font-size:22px}
+.top .iconbtn{color:var(--gilt)}
+.top .iconbtn:hover{background:rgba(255,255,255,.06)}
+.nav{background:var(--paper)}
+
+/* Mga label: hindi na ALL CAPS, parang italic na sub-heading sa Bibliya */
+.label{text-transform:none;letter-spacing:0;font-family:var(--font-display);font-style:italic;font-weight:400;font-size:15px;color:var(--muted)}
+
+/* Mga card: parang pahina, hindi app card */
+.card,.votd,.preview{border-radius:4px;background:var(--surface);border:1px solid var(--line)}
+.btn{border-radius:4px}
+.btn.small{border-radius:4px}
+.chip,.readerbar select,.seg{border-radius:4px}
+.searchbox input,textarea{border-radius:4px}
+
+/* Talata para sa araw na ito: nakasentro, may pulang inisyal na parang rubrika */
+.votd{border-left:1px solid var(--line);padding:22px 20px;text-align:center}
+.votd .label{color:var(--rubric)}
+.votd blockquote{font-size:calc(var(--read-size) + 4px);line-height:1.5}
+.votd > .row{justify-content:center!important;flex-direction:column;gap:14px}
+.votd .ref{font-family:var(--font-display);font-weight:400;font-variant:small-caps;letter-spacing:.03em;font-size:17px}
+
+/* Ituloy ang pagbasa: may ribbon bookmark na nakasabit */
+#continueBtn{position:relative}
+.card:has(#continueBtn){position:relative;overflow:visible}
+.card:has(#continueBtn)::before{content:"";position:absolute;top:-1px;right:58px;width:14px;height:44px;background:var(--rubric);clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%)}
+#continueRef{font-family:var(--font-display);font-weight:700;font-size:20px}
+
+/* Reader: pangalan ng aklat sa gitna na may gilt na guhit, chapter number bilang malaking pulang inisyal */
+.chaphead{justify-content:center;margin:10px 0 18px;padding-bottom:10px;border-bottom:3px double var(--gilt)}
+.chaphead h1{font-weight:400;font-variant:small-caps;letter-spacing:.06em;font-size:30px}
+.chaphead .num{display:none}
+.text{line-height:1.7}
+.text:not(.cmp)::before{content:attr(data-ch);float:left;font-family:var(--font-display);font-weight:700;color:var(--rubric);font-size:calc(var(--read-size) * 3.3);line-height:.82;margin:.08em .14em 0 0}
+.text:not(.cmp) > .v:first-child sup{display:none}
+.v sup{font-family:var(--font-display);font-weight:700;color:var(--rubric);font-size:.62em;font-variant-numeric:oldstyle-nums}
+.v.sel{text-decoration-color:var(--rubric)}
+.v .mark{background:var(--rubric)}
+.pager .btn.ghost{background:none;border:1px solid var(--line);font-family:var(--font-display);font-size:17px}
+
+/* Search results at listahan */
+.res .ref{color:var(--rubric);font-family:var(--font-display);font-variant:small-caps;font-size:16px;letter-spacing:.03em}
+
+/* Pumili ng aklat: parang talaan ng mga aklat sa simula ng Bibliya */
+.sheet{background:var(--paper);border-radius:6px 6px 0 0;border-top:3px double var(--gilt)}
+.sheet h3{font-family:var(--font-display);font-weight:400;font-variant:small-caps;letter-spacing:.04em;font-size:20px}
+#pickBody .label{color:var(--rubric);font-size:17px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.grid-books{grid-template-columns:1fr;gap:0}
+/* Dalawang hanay: Lumang Tipan sa kaliwa, Bagong Tipan sa kanan (label, listahan, label, listahan → column flow) */
+#pickBody:has(.grid-books){display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;grid-auto-flow:column;column-gap:18px;align-items:start}
+#pickBody .grid-books{margin-top:4px}
+#pickBody .grid-books button{font-size:15px;padding:8px 2px;line-height:1.25}
+.grid-books button{border:0;border-bottom:1px dotted var(--line);border-radius:0;background:none;padding:9px 2px;font-family:var(--font-display);font-size:16px}
+.grid-ch button{border-radius:4px;font-family:var(--font-display);font-size:16px;background:var(--surface)}
+.grid-books button[aria-current="true"]{background:none;color:var(--rubric);font-weight:700;border-color:var(--rubric)}
+.grid-ch button[aria-current="true"]{background:var(--rubric);border-color:var(--rubric);color:var(--accent-ink)}
+.actions button,.aibtns button{border-radius:4px}
+</style>
 </head>
 <body>
 <div class="app">
@@ -528,7 +614,7 @@ async function renderChapter(){
   $("#pickLabel").textContent = refStr(b,c);
   $("#topTitle").textContent = refStr(b,c);
   $("#chapBook").textContent = bookName(b);
-  $("#chapNum").textContent = c;
+  $("#chapNum").textContent = c; $("#chapter").dataset.ch = c; // 2026-11-20: para sa malaking pulang chapter number (CSS ::before)
   const box=$("#chapter");
   if(!DATA[S.ver] || (S.cmp && !DATA[S.cmp])) box.innerHTML='<div class="loading">Binubuksan ang '+VERS[S.ver].full+'…</div>';
   let data,data2;
