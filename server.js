@@ -24,6 +24,11 @@ const BLOCK = new Set(["server.js","start-bible.cmd","ai-cache.json","download-c
 const AI_KEY = process.env.GEMINI_API_KEY || "";
 const AI_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
 const AI_BASE = process.env.GEMINI_API_BASE || "https://generativelanguage.googleapis.com/v1beta";
+// 2026-11-20: kapag abala/down ang pangunahing model (503 atbp.), susubukan ang mga ito (pinaghihiwalay ng kuwit).
+// Lagyan ng GEMINI_FALLBACK_MODELS= (walang laman) para patayin ang fallback.
+const AI_FALLBACKS = (process.env.GEMINI_FALLBACK_MODELS ?? "gemini-flash-lite-latest").split(",").map(s => s.trim()).filter(m => m && m !== AI_MODEL);
+const AI_TIMEOUT = Number(process.env.AI_TIMEOUT_MS) || 35000;      // bawat subok sa isang model
+const AI_DEADLINE = Number(process.env.AI_DEADLINE_MS) || 60000;    // kabuuang hintay ng user, kasama ang fallback
 const AI_DAILY_LIMIT = Number(process.env.AI_DAILY_LIMIT) || 200;   // bagong AI request bawat araw (hindi kasama ang galing sa cache)
 const AI_PER_DEVICE = Number(process.env.AI_PER_DEVICE) || 15;      // bawat phone/PC, kada 10 minuto
 const COMM_BASE = process.env.COMMENTARY_BASE || "https://bible.helloao.org/api/c/matthew-henry";
@@ -76,17 +81,38 @@ function refOf(p, tl) {
 }
 // Kapag naka-host (Render atbp.), nasa likod ng proxy ang server, kaya iisang IP lang ang makikita sa socket.
 // I-on lang ito sa hosting (TRUST_PROXY=1). Sa LAN, naka-off para hindi ma-peke ng phone ang IP niya.
-// Unahin ang True-Client-IP (galing Cloudflare sa harap ng Render). Kung wala, ang HULING IP sa X-Forwarded-For
-// (idinagdag ng proxy mismo). Hindi ang una: kayang pekein ng phone ang unang IP dahil nag-a-append lang ang proxy.
+// 2026-11-20: hindi na binabasa ang True-Client-IP nang kusa. Kapag hindi ito pinapalitan ng proxy, kayang
+// pekein ng phone (ipadala ang sariling True-Client-IP) para malusutan ang limit kada device.
+// Default: ang IP sa X-Forwarded-For na PROXY_HOPS mula sa kanan (1 = huling idinagdag ng proxy mismo).
+// Hindi ang una: kayang pekein ng phone ang unang IP dahil nag-a-append lang ang proxy.
+// CLIENT_IP_HEADER (hal. cf-connecting-ip): gamitin LANG kapag napatunayan sa /api/ip (DEBUG_IP=1) na
+// pinapalitan ito ng proxy kahit may ipadalang peke ang phone.
 const TRUST_PROXY = process.env.TRUST_PROXY === "1";
+const PROXY_HOPS = Math.min(5, Math.max(1, Math.floor(Number(process.env.PROXY_HOPS)) || 1));
+const IP_HEADER = /^[a-z0-9-]{1,40}$/i.test(process.env.CLIENT_IP_HEADER || "") ? process.env.CLIENT_IP_HEADER.toLowerCase() : "";
+const DEBUG_IP = process.env.DEBUG_IP === "1";
+const cleanIp = s => String(s || "").trim().replace(/^::ffff:/, "").slice(0, 64);
+function forwardedList(req) {
+  return String(req.headers["x-forwarded-for"] || "").split(",").map(s => s.trim()).filter(Boolean);
+}
 function clientIp(req) {
   if (TRUST_PROXY) {
-    const tci = String(req.headers["true-client-ip"] || "").trim();
-    if (tci) return tci.replace(/^::ffff:/, "");
-    const fwd = String(req.headers["x-forwarded-for"] || "").split(",").map(s => s.trim()).filter(Boolean).pop();
-    if (fwd) return fwd.replace(/^::ffff:/, "");
+    if (IP_HEADER) {
+      const h = cleanIp(String(req.headers[IP_HEADER] || "").split(",")[0]);
+      if (h) return h;
+    }
+    const fwd = forwardedList(req);
+    if (fwd.length) return cleanIp(fwd[Math.max(0, fwd.length - PROXY_HOPS)]);
   }
-  return (req.socket.remoteAddress || "").replace(/^::ffff:/, "");
+  return cleanIp(req.socket.remoteAddress);
+}
+// Pang-check lang pagka-deploy (DEBUG_IP=1): ipinapakita kung anong IP ang nakikita ng server at ang mga header
+// na may kinalaman. Patayin ulit (alisin ang DEBUG_IP) pagkatapos.
+function ipReport(req) {
+  const h = n => req.headers[n] || null;
+  return {ip: clientIp(req), socket: cleanIp(req.socket.remoteAddress), trustProxy: TRUST_PROXY, proxyHops: PROXY_HOPS,
+    clientIpHeader: IP_HEADER || null, "x-forwarded-for": h("x-forwarded-for"), "true-client-ip": h("true-client-ip"),
+    "cf-connecting-ip": h("cf-connecting-ip"), "x-real-ip": h("x-real-ip")};
 }
 
 // ---------- AI: cache at limits ----------
@@ -112,6 +138,8 @@ function allow(ip) {
   const now = Date.now(), list = (perIp.get(ip) || []).filter(t => now - t < 10 * 60 * 1000);
   if (list.length >= AI_PER_DEVICE) return "Medyo marami nang tanong mula sa device na ito. Maghintay ng ilang minuto, tapos subukan ulit.";
   list.push(now); perIp.set(ip, list); dayCount++;
+  // 2026-11-20: linisin ang mga lumang IP para hindi lumaki nang lumaki ang listahan
+  if (perIp.size > 5000) for (const [k, v] of perIp) if (!v.some(t => now - t < 10 * 60 * 1000)) perIp.delete(k);
   return "";
 }
 
@@ -147,30 +175,59 @@ Keep it around 350 to 550 words.`,
 Keep it around 700 to 1000 words.`
 };
 
-async function callGemini(prompt) {
-  if (typeof fetch !== "function") throw Object.assign(new Error("Luma ang Node.js sa PC. Kailangan ng Node 18 o mas bago para sa AI."), {status: 500});
-  const url = AI_BASE + "/models/" + encodeURIComponent(AI_MODEL) + ":generateContent";
+// Mga error na pansamantala lang (abala o down ang model): pwedeng subukan ang fallback model.
+const RETRYABLE = new Set([500, 502, 503, 504]);
+const aiErr = (msg, status, retry) => Object.assign(new Error(msg), {status, retry: !!retry});
+
+async function callModel(model, prompt, ms) {
+  const url = AI_BASE + "/models/" + encodeURIComponent(model) + ":generateContent";
   let r;
   try {
-    r = await fetch(url, {method: "POST", signal: AbortSignal.timeout(90000),
+    r = await fetch(url, {method: "POST", signal: AbortSignal.timeout(ms),
       headers: {"Content-Type": "application/json", "x-goog-api-key": AI_KEY},
       body: JSON.stringify({systemInstruction: {parts: [{text: SYSTEM}]}, contents: [{role: "user", parts: [{text: prompt}]}], generationConfig: {temperature: 0.5}})});
   } catch (e) {
-    throw Object.assign(new Error("Hindi maabot ang AI. Paki-check ang internet ng PC na may server."), {status: 502});
+    const timedOut = e && (e.name === "TimeoutError" || e.name === "AbortError");
+    console.error("  [AI] " + model + ": " + (timedOut ? "timeout pagkalipas ng " + Math.round(ms / 1000) + "s" : "hindi maabot (" + (e && e.message) + ")"));
+    throw timedOut ? aiErr("Natagalan ang AI sa pagsagot. Subukan ulit mamaya, o gamitin muna ang Matthew Henry.", 504, true)
+                   : aiErr("Hindi maabot ang AI ngayon. Subukan ulit mamaya, o gamitin muna ang Matthew Henry.", 502, true);
   }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
     const msg = (j.error && j.error.message) || ("HTTP " + r.status);
-    console.error("  [AI] Gemini error " + r.status + ": " + msg.slice(0, 200));
-    if (r.status === 429) throw Object.assign(new Error("Naubos muna ang libreng limit ng AI. Subukan ulit mamaya, o gamitin muna ang Matthew Henry."), {status: 429});
-    if (r.status === 400 && /api key/i.test(msg) || r.status === 401 || r.status === 403) throw Object.assign(new Error("May problema sa API key ng AI. Pakisabi sa admin ng app."), {status: 503});
-    if (r.status === 404) throw Object.assign(new Error("Hindi makita ang AI model na \"" + AI_MODEL + "\". Pakisabi sa admin ng app."), {status: 503});
-    throw Object.assign(new Error("May error ang AI ngayon. Subukan ulit mamaya."), {status: 502});
+    console.error("  [AI] Gemini error " + r.status + " (" + model + "): " + msg.slice(0, 200));
+    if (r.status === 429) throw aiErr("Naubos muna ang libreng limit ng AI. Subukan ulit mamaya, o gamitin muna ang Matthew Henry.", 429);
+    if (r.status === 400 && /api key/i.test(msg) || r.status === 401 || r.status === 403) throw aiErr("May problema sa API key ng AI. Pakisabi sa admin ng app.", 503);
+    if (r.status === 404) throw aiErr("Hindi makita ang AI model na \"" + model + "\". Pakisabi sa admin ng app.", 503);
+    if (RETRYABLE.has(r.status)) throw aiErr("Abala ang AI ngayon (maraming gumagamit). Subukan ulit pagkalipas ng ilang minuto, o gamitin muna ang Matthew Henry.", 503, true);
+    throw aiErr("May error ang AI ngayon. Subukan ulit mamaya, o gamitin muna ang Matthew Henry.", 502);
   }
   const cand = (j.candidates || [])[0];
   const text = cand && cand.content && (cand.content.parts || []).map(p => p.text || "").join("").trim();
-  if (!text) throw Object.assign(new Error("Walang naibigay na sagot ang AI para sa talatang ito. Subukan ulit, o gamitin ang Matthew Henry."), {status: 502});
+  if (!text) throw aiErr("Walang naibigay na sagot ang AI para sa talatang ito. Subukan ulit, o gamitin ang Matthew Henry.", 502);
   return text;
+}
+
+async function callGemini(prompt) {
+  if (typeof fetch !== "function") throw aiErr("Luma ang Node.js sa PC. Kailangan ng Node 18 o mas bago para sa AI.", 500);
+  const end = Date.now() + AI_DEADLINE;
+  let first;
+  for (const [i, model] of [AI_MODEL, ...AI_FALLBACKS].entries()) {
+    const left = end - Date.now();
+    if (i > 0 && left < 5000) break;               // kulang na ang oras para sa isa pang subok
+    try {
+      const text = await callModel(model, prompt, Math.min(AI_TIMEOUT, left));
+      if (i > 0) console.log("  [AI] ginamit ang fallback model: " + model);
+      return text;
+    } catch (e) {
+      if (i === 0) {
+        first = e;
+        if (!e.retry) throw e;                     // 429, API key, maling model: walang silbi ang fallback
+      }
+      // pumalya rin ang fallback: subukan ang susunod; kapag ubos na, ang unang error ang ipapakita
+    }
+  }
+  throw first;
 }
 
 async function handleAi(req, res) {
@@ -247,6 +304,7 @@ http.createServer((req, res) => {
   if (p === "/api/ai") return handleAi(req, res).catch(e => sendJson(res, 500, {error: "May error sa server."}));
   if (p === "/api/commentary") return handleCommentary(req, res, url).catch(e => sendJson(res, 500, {error: "May error sa server."}));
   if (p === "/api/status") return sendJson(res, 200, {ai: !!AI_KEY});
+  if (p === "/api/ip") return DEBUG_IP ? sendJson(res, 200, ipReport(req)) : sendJson(res, 404, {error: "Hindi makita"});
   if (p.endsWith("/")) p += "index.html";
   const file = path.normalize(path.join(ROOT, p));
   const base = path.basename(file);

@@ -3,5 +3,8 @@
 GEMINI_API_KEY=ilagay-dito-ang-key-mo
 # Opsyonal:
 # GEMINI_MODEL=gemini-flash-latest
+# GEMINI_FALLBACK_MODELS=gemini-flash-lite-latest   (kapag abala ang pangunahing model; walang laman = walang fallback)
+# AI_TIMEOUT_MS=35000   (hintay bawat model)
+# AI_DEADLINE_MS=60000  (kabuuang hintay, kasama ang fallback)
 # AI_DAILY_LIMIT=200
 # AI_PER_DEVICE=15
