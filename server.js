@@ -76,17 +76,38 @@ function refOf(p, tl) {
 }
 // Kapag naka-host (Render atbp.), nasa likod ng proxy ang server, kaya iisang IP lang ang makikita sa socket.
 // I-on lang ito sa hosting (TRUST_PROXY=1). Sa LAN, naka-off para hindi ma-peke ng phone ang IP niya.
-// Unahin ang True-Client-IP (galing Cloudflare sa harap ng Render). Kung wala, ang HULING IP sa X-Forwarded-For
-// (idinagdag ng proxy mismo). Hindi ang una: kayang pekein ng phone ang unang IP dahil nag-a-append lang ang proxy.
+// 2026-11-20: hindi na binabasa ang True-Client-IP nang kusa. Kapag hindi ito pinapalitan ng proxy, kayang
+// pekein ng phone (ipadala ang sariling True-Client-IP) para malusutan ang limit kada device.
+// Default: ang IP sa X-Forwarded-For na PROXY_HOPS mula sa kanan (1 = huling idinagdag ng proxy mismo).
+// Hindi ang una: kayang pekein ng phone ang unang IP dahil nag-a-append lang ang proxy.
+// CLIENT_IP_HEADER (hal. cf-connecting-ip): gamitin LANG kapag napatunayan sa /api/ip (DEBUG_IP=1) na
+// pinapalitan ito ng proxy kahit may ipadalang peke ang phone.
 const TRUST_PROXY = process.env.TRUST_PROXY === "1";
+const PROXY_HOPS = Math.min(5, Math.max(1, Math.floor(Number(process.env.PROXY_HOPS)) || 1));
+const IP_HEADER = /^[a-z0-9-]{1,40}$/i.test(process.env.CLIENT_IP_HEADER || "") ? process.env.CLIENT_IP_HEADER.toLowerCase() : "";
+const DEBUG_IP = process.env.DEBUG_IP === "1";
+const cleanIp = s => String(s || "").trim().replace(/^::ffff:/, "").slice(0, 64);
+function forwardedList(req) {
+  return String(req.headers["x-forwarded-for"] || "").split(",").map(s => s.trim()).filter(Boolean);
+}
 function clientIp(req) {
   if (TRUST_PROXY) {
-    const tci = String(req.headers["true-client-ip"] || "").trim();
-    if (tci) return tci.replace(/^::ffff:/, "");
-    const fwd = String(req.headers["x-forwarded-for"] || "").split(",").map(s => s.trim()).filter(Boolean).pop();
-    if (fwd) return fwd.replace(/^::ffff:/, "");
+    if (IP_HEADER) {
+      const h = cleanIp(String(req.headers[IP_HEADER] || "").split(",")[0]);
+      if (h) return h;
+    }
+    const fwd = forwardedList(req);
+    if (fwd.length) return cleanIp(fwd[Math.max(0, fwd.length - PROXY_HOPS)]);
   }
-  return (req.socket.remoteAddress || "").replace(/^::ffff:/, "");
+  return cleanIp(req.socket.remoteAddress);
+}
+// Pang-check lang pagka-deploy (DEBUG_IP=1): ipinapakita kung anong IP ang nakikita ng server at ang mga header
+// na may kinalaman. Patayin ulit (alisin ang DEBUG_IP) pagkatapos.
+function ipReport(req) {
+  const h = n => req.headers[n] || null;
+  return {ip: clientIp(req), socket: cleanIp(req.socket.remoteAddress), trustProxy: TRUST_PROXY, proxyHops: PROXY_HOPS,
+    clientIpHeader: IP_HEADER || null, "x-forwarded-for": h("x-forwarded-for"), "true-client-ip": h("true-client-ip"),
+    "cf-connecting-ip": h("cf-connecting-ip"), "x-real-ip": h("x-real-ip")};
 }
 
 // ---------- AI: cache at limits ----------
@@ -112,6 +133,8 @@ function allow(ip) {
   const now = Date.now(), list = (perIp.get(ip) || []).filter(t => now - t < 10 * 60 * 1000);
   if (list.length >= AI_PER_DEVICE) return "Medyo marami nang tanong mula sa device na ito. Maghintay ng ilang minuto, tapos subukan ulit.";
   list.push(now); perIp.set(ip, list); dayCount++;
+  // 2026-11-20: linisin ang mga lumang IP para hindi lumaki nang lumaki ang listahan
+  if (perIp.size > 5000) for (const [k, v] of perIp) if (!v.some(t => now - t < 10 * 60 * 1000)) perIp.delete(k);
   return "";
 }
 
@@ -247,6 +270,7 @@ http.createServer((req, res) => {
   if (p === "/api/ai") return handleAi(req, res).catch(e => sendJson(res, 500, {error: "May error sa server."}));
   if (p === "/api/commentary") return handleCommentary(req, res, url).catch(e => sendJson(res, 500, {error: "May error sa server."}));
   if (p === "/api/status") return sendJson(res, 200, {ai: !!AI_KEY});
+  if (p === "/api/ip") return DEBUG_IP ? sendJson(res, 200, ipReport(req)) : sendJson(res, 404, {error: "Hindi makita"});
   if (p.endsWith("/")) p += "index.html";
   const file = path.normalize(path.join(ROOT, p));
   const base = path.basename(file);
