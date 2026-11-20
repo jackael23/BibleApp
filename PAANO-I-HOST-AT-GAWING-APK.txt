@@ -35,6 +35,18 @@ HAKBANG 2 - I-host sa Render (libre)
 5. Create Web Service. Hintayin ang "Live". Makikita ang URL, hal.
    https://bibliya-ng-iglesia.onrender.com
 6. I-test sa phone browser: basahin, search, at "Ipaliwanag".
+7. I-check ang limit kada phone (isang beses lang, pagka-deploy):
+   a. Idagdag pansamantala ang  DEBUG_IP = 1  sa Environment Variables. Hintayin ang "Live".
+   b. Sa phone (naka-data, hindi Wi-Fi), buksan:  https://<url-mo>/api/ip
+      Dapat ang "ip" ay ang IP ng phone mo (makikita sa whatismyip.com sa parehong phone).
+   c. Kapag IP ng Cloudflare/Render ang lumabas (hindi ang sa phone), tingnan ang
+      "x-forwarded-for": bilangin mula sa KANAN kung pang-ilan ang IP ng phone,
+      at ilagay iyon bilang  PROXY_HOPS = 2  (o 3). Ulitin ang b.
+   d. Opsyonal lang ang CLIENT_IP_HEADER (hal. cf-connecting-ip). Gamitin lang kapag
+      napatunayang pinapalitan ito ng Render kahit magpadala ka ng peke, hal. sa PC:
+        curl -H "CF-Connecting-IP: 1.2.3.4" https://<url-mo>/api/ip
+      Kapag "1.2.3.4" ang lumabas sa "cf-connecting-ip", HUWAG itong gamitin.
+   e. Tanggalin ulit ang DEBUG_IP pagkatapos.
 
 Mga dapat malaman sa libreng plan:
 - Natutulog ang server kapag 15 minutong walang gumagamit. Ang unang bukas pagkatapos
