@@ -1,0 +1,7 @@
+# Kopyahin ang file na ito bilang ".env" (sa parehong folder), tapos ilagay ang totoong key.
+# HUWAG i-share ang .env kahit kanino.
+GEMINI_API_KEY=ilagay-dito-ang-key-mo
+# Opsyonal:
+# GEMINI_MODEL=gemini-flash-latest
+# AI_DAILY_LIMIT=200
+# AI_PER_DEVICE=15

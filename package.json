@@ -1,0 +1,13 @@
+{
+  "name": "bibliya-ng-iglesia",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bibliya ng Iglesia: Bible app (PWA) + maliit na Node server para sa AI at Matthew Henry.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

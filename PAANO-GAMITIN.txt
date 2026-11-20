@@ -1,0 +1,52 @@
+BIBLIYA NG IGLESIA - local na bersyon
+=====================================
+
+PAANO PATAKBUHIN (sa PC)
+1. I-double-click ang  start-bible.cmd
+2. Kapag nagtanong ang Windows Firewall, piliin ang "Private networks" at Allow
+   (kailangan ito para mabuksan sa phone gamit ang Wi-Fi).
+3. Buksan sa browser:  http://localhost:8080
+   Para ihinto: isara ang itim na window.
+
+SA PHONE (parehong Wi-Fi ng PC)
+- Buksan ang "Sa phone" na link na makikita sa itim na window (hal. http://192.168.1.10:8080).
+- Paalala: sa ganitong link (http + IP address), gumagana ang app pero HINDI ito
+  ma-i-install at HINDI gagana offline. Patakaran ito ng browsers: kailangan ng https.
+  Sa PC (localhost), gumagana ang install at offline.
+
+I-INSTALL SA PC (parang totoong app)
+- Sa Chrome/Edge, buksan ang http://localhost:8080 tapos i-click ang install icon sa address bar.
+  Pagkatapos nito, gagana na kahit walang internet (pero dapat tumatakbo ang start-bible.cmd
+  sa unang bukas para ma-download ang Bibliya).
+
+KAPAG MAY BINAGO SA APP
+- Buksan ang sw.js at palitan ang  VERSION = "bibliya-v1"  ng "bibliya-v2" (at iba pa),
+  para kunin ng browser ang bagong bersyon.
+
+KAILANGAN: Node.js (meron na sa PC mo). Walang npm install.
+Iba pang port: sa terminal, i-type  set PORT=8081  tapos  node server.js
+
+PALIWANAG AT SERMON (AI) - idinagdag 2026-11-19
+- Sa Basahin, pindutin ang isa o ilang talata. Sa ibaba, piliin ang "Ipaliwanag" o "Gawan ng sermon".
+- Pwedeng palitan ang Tagalog/English, at may "Matthew Henry" (lumang komentaryo, English, libre).
+- Gawa ng AI ang sagot kaya pwedeng magkamali: ikumpara sa Bibliya at itanong sa pastor.
+
+PAANO I-SETUP ANG AI (isang beses lang, sa PC)
+1. Kumuha ng libreng Gemini API key: https://aistudio.google.com/apikey
+2. Sa folder na ito, kopyahin ang  env-example.txt  at pangalanan ang kopya na  .env
+   (sa Notepad: Save As > File name: .env > Save as type: All files).
+3. Sa .env, palitan ang "ilagay-dito-ang-key-mo" ng totoong key. I-save.
+4. Isara at buksan ulit ang start-bible.cmd. Dapat makita: "AI (Paliwanag/Sermon): ON".
+- HUWAG i-share ang .env. Hindi ito mabubuksan sa browser (naka-block sa server).
+- Kailangan ng internet ang PC para sa AI. Naka-save ang mga sagot sa ai-cache.json,
+  kaya ang parehong talata ay hindi na ulit magagastos.
+- May limit: 200 bagong sagot bawat araw, at 15 bawat phone kada 10 minuto
+  (pwedeng baguhin sa .env: AI_DAILY_LIMIT at AI_PER_DEVICE). Libre ang Gemini hanggang
+  sa limit ng free tier; walang bayad hangga't hindi ka nagse-set up ng billing sa Google.
+- Kapag "Hindi makita ang AI model": idagdag sa .env ang  GEMINI_MODEL=gemini-2.5-flash
+  (o ang pangalan ng model na nasa aistudio.google.com).
+
+MATTHEW HENRY OFFLINE (opsyonal)
+- Kapag may internet ang PC, kusa nitong kinukuha at sine-save ang komentaryo.
+- Para gumana kahit walang internet: i-double-click ang  download-commentary.cmd  (isang beses,
+  ilang minuto). Pwedeng ulitin; nilalaktawan ang na-download na.

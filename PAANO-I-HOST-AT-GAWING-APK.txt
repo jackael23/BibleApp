@@ -1,0 +1,87 @@
+BIBLIYA NG IGLESIA - I-HOST ONLINE + GAWING APK (PWABuilder)
+=============================================================
+Ginawa 2026-11-20. Gabay ito para sa: (1) i-host ang app sa Render (libre, https),
+(2) gumawa ng APK gamit ang PWABuilder (walang Android Studio), (3) Play Store sa susunod.
+
+BAGO MAGSIMULA - mahalagang desisyon
+- Ang APK ay "naka-kabit" sa URL ng site. Kapag pinalitan mo ang URL (hal. lumipat sa
+  sariling domain), kailangang gumawa ulit ng APK. Kaya bago mag-Play Store, siguraduhing
+  final na ang URL. Para sa testing ngayon, okay na ang libreng xxx.onrender.com.
+
+----------------------------------------------------------------------------
+HAKBANG 1 - Ilagay sa GitHub (private repo)
+----------------------------------------------------------------------------
+1. Sa github.com: New repository > pangalan (hal. bibliya-ng-iglesia) > Private > Create.
+2. I-upload ang LAMAN ng folder na ito (dapat nasa pinakataas ng repo ang server.js
+   at package.json, hindi naka-loob sa ibang folder).
+   - Pinakamadali: GitHub Desktop > Add local repository > piliin ang folder na ito > Publish.
+3. SIGURADUHIN na HINDI kasama ang .env at ai-cache.json (nasa .gitignore na sila).
+   Silipin sa github.com ang listahan ng files bago magpatuloy.
+
+----------------------------------------------------------------------------
+HAKBANG 2 - I-host sa Render (libre)
+----------------------------------------------------------------------------
+1. Sa render.com: mag-sign up gamit ang GitHub.
+2. New + > Web Service > piliin ang repo.
+3. Settings:
+   - Runtime: Node
+   - Build Command:  npm install      (walang ini-install, mabilis lang)
+   - Start Command:  npm start
+   - Instance Type:  Free
+4. Environment Variables (Add Environment Variable):
+   - GEMINI_API_KEY = (ang key mo mula aistudio.google.com/apikey)
+   - TRUST_PROXY    = 1      <- mahalaga: para gumana ang limit kada phone
+   - (opsyonal) GEMINI_MODEL = gemini-flash-latest
+5. Create Web Service. Hintayin ang "Live". Makikita ang URL, hal.
+   https://bibliya-ng-iglesia.onrender.com
+6. I-test sa phone browser: basahin, search, at "Ipaliwanag".
+
+Mga dapat malaman sa libreng plan:
+- Natutulog ang server kapag 15 minutong walang gumagamit. Ang unang bukas pagkatapos
+  ay mabagal (hanggang ~1 minuto). Ang pagbasa ng Bibliya ay naka-cache na sa phone,
+  kaya ang AI lang ang kadalasang maaapektuhan.
+- Nabubura ang ai-cache.json at commentary/ tuwing nagre-restart. Gagana pa rin, pero
+  gagamit ulit ng AI limit para sa parehong talata.
+
+----------------------------------------------------------------------------
+HAKBANG 3 - Gumawa ng APK sa PWABuilder
+----------------------------------------------------------------------------
+1. Buksan ang https://www.pwabuilder.com > ilagay ang URL mula Hakbang 2 > Start.
+2. Package For Stores > Android > Generate Package.
+3. Sa Options:
+   - Package ID: hal. ph.iglesia.bibliya   (HINDI na ito mapapalitan sa Play Store)
+   - App name: Bibliya ng Iglesia
+   - Signing key: "Create new" (unang beses lang)
+4. Download. Ang zip ay may: .apk (pang-install sa phone), .aab (pang-Play Store),
+   signing.keystore, signing-key-info.txt, assetlinks.json.
+
+!!! BACKUP AGAD: signing.keystore + signing-key-info.txt !!!
+   - Ilagay sa 2 lugar (hal. Google Drive + USB). Kailangan ito sa BAWAT update.
+   - HUWAG i-upload sa GitHub. HUWAG i-share.
+
+----------------------------------------------------------------------------
+HAKBANG 4 - assetlinks.json (para walang address bar sa app)
+----------------------------------------------------------------------------
+1. Sa folder na ito, gumawa ng folder na  .well-known  at ilagay doon ang
+   assetlinks.json mula sa zip.  ->  .well-known\assetlinks.json
+   (Sa Windows Explorer: kung ayaw tumanggap ng pangalang ".well-known", i-type ang
+   ".well-known." na may tuldok sa dulo; tatanggalin ng Windows ang huling tuldok.)
+2. I-commit at i-push sa GitHub. Kusang magre-redeploy ang Render.
+3. I-check sa browser:  https://<url-mo>/.well-known/assetlinks.json  -> dapat lumabas ang JSON.
+
+----------------------------------------------------------------------------
+HAKBANG 5 - I-install sa phone
+----------------------------------------------------------------------------
+1. Ipadala ang .apk sa phone (Messenger/Drive/USB).
+2. Buksan > payagan ang "Install unknown apps" kapag nagtanong > Install.
+3. Kapag may address bar pa sa itaas ng app: mali o hindi pa naka-deploy ang
+   assetlinks.json (balikan ang Hakbang 4).
+
+----------------------------------------------------------------------------
+SA SUSUNOD - Google Play Store
+----------------------------------------------------------------------------
+- Kailangan ng Google Play Console developer account (may one-time fee).
+- I-upload ang .aab (hindi ang .apk).
+- Kapag naka-on ang Play App Signing, magbibigay si Google ng bagong SHA-256
+  fingerprint. Idagdag ito sa assetlinks.json (kasama ng luma) at i-push ulit.
+- Bawat update: gamitin ang PAREHONG keystore at taasan ang version sa PWABuilder.

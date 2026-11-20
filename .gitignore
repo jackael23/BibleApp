@@ -1,0 +1,4 @@
+.env
+ai-cache.json
+commentary/
+node_modules/

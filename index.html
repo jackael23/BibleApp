@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="tl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2f3b2a">
+<title>Bibliya ng Iglesia</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bibliya">
+<style>
+@font-face{font-family:"Literata";src:url("fonts/literata-latin-400-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"Literata";src:url("fonts/literata-latin-400-italic.woff2") format("woff2");font-weight:400;font-style:italic;font-display:swap}
+@font-face{font-family:"Literata";src:url("fonts/literata-latin-600-normal.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap}
+@font-face{font-family:"Figtree";src:url("fonts/figtree-latin-400-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"Figtree";src:url("fonts/figtree-latin-500-normal.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:"Figtree";src:url("fonts/figtree-latin-600-normal.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap}
+@font-face{font-family:"Figtree";src:url("fonts/figtree-latin-700-normal.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap}
+/* Layout idea: one-column reading surface like a printed page, olive-ink palette (olive tree), app chrome pinned top and bottom */
+:root{
+  --paper:#f5f6f2; --surface:#ffffff; --ink:#1d221c; --muted:#6a7266; --line:#dde1d8;
+  --accent:#55652a; --accent-ink:#ffffff; --accent-soft:#e8ecdb;
+  --hl-y:#fbe78a; --hl-g:#cfe6b4; --hl-b:#c4dcf3; --hl-p:#f6c9d6;
+  --font-display:"Literata",Georgia,"Times New Roman",serif;
+  --font-body:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --read-size:19px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#121512; --surface:#1a1e19; --ink:#e6e9e1; --muted:#9aa294; --line:#2c3229;
+    --accent:#b9c97c; --accent-ink:#151a10; --accent-soft:#283020;
+    --hl-y:#5c4f14; --hl-g:#2f4a24; --hl-b:#22405c; --hl-p:#5a2a3a;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#121512; --surface:#1a1e19; --ink:#e6e9e1; --muted:#9aa294; --line:#2c3229;
+  --accent:#b9c97c; --accent-ink:#151a10; --accent-soft:#283020;
+  --hl-y:#5c4f14; --hl-g:#2f4a24; --hl-b:#22405c; --hl-p:#5a2a3a;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.45;-webkit-tap-highlight-color:transparent}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{text-wrap:balance;margin:0}
+
+.app{display:flex;flex-direction:column;height:100%;max-width:760px;margin:0 auto}
+.top{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--paper)}
+.top .title{font-family:var(--font-display);font-weight:600;font-size:20px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.view{display:none;padding:16px 16px 32px}
+.view.on{display:block}
+.nav{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);background:var(--surface);padding-bottom:env(safe-area-inset-bottom)}
+.nav button{background:none;border:0;padding:8px 4px 10px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;font-weight:600;color:var(--muted)}
+.nav button svg{width:22px;height:22px}
+.nav button[aria-current="page"]{color:var(--accent)}
+
+.iconbtn{background:none;border:1px solid transparent;border-radius:10px;width:40px;height:40px;display:grid;place-items:center;color:var(--ink);flex:none}
+.iconbtn:hover{background:var(--accent-soft)}
+.iconbtn svg{width:22px;height:22px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-weight:600;font-size:14px}
+.btn{border:0;border-radius:12px;padding:11px 16px;font-weight:600;background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:var(--accent-soft);color:var(--ink)}
+.btn.small{padding:7px 12px;font-size:14px;border-radius:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.muted{color:var(--muted)}
+.label{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+
+/* Home */
+.date{font-size:14px;color:var(--muted);margin-bottom:12px}
+.votd{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:14px;padding:20px;display:grid;gap:14px}
+.votd blockquote{margin:0;font-family:var(--font-display);font-size:calc(var(--read-size) + 3px);line-height:1.55}
+.votd .ref{font-weight:700}
+.stack{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+.stack>*,.card>*{min-width:0}
+.searchbox .btn{flex:none}
+[hidden]{display:none!important}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:8px}
+.card h2{font-size:17px;font-family:var(--font-body)}
+.linkrow{display:flex;justify-content:space-between;align-items:center;gap:12px;background:none;border:0;padding:0;text-align:left;width:100%}
+
+/* Reader */
+.readerbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.readerbar select{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 10px;font-weight:600;font-size:14px}
+.chaphead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:6px 0 16px}
+.chaphead h1{font-family:var(--font-display);font-size:32px;font-weight:600}
+.chaphead .num{font-family:var(--font-display);font-size:44px;color:var(--accent);line-height:1}
+.text{font-family:var(--font-display);font-size:var(--read-size);line-height:1.75;max-width:65ch}
+.v{cursor:pointer;border-radius:4px;padding:1px 0;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.v sup{font-family:var(--font-body);font-size:.6em;font-weight:700;color:var(--accent);margin:0 3px 0 2px;vertical-align:.45em}
+.v.hl-y{background:var(--hl-y)} .v.hl-g{background:var(--hl-g)} .v.hl-b{background:var(--hl-b)} .v.hl-p{background:var(--hl-p)}
+.v.sel{text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:2px;text-underline-offset:4px}
+.v .mark{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-left:3px;vertical-align:.2em}
+.v.empty{color:var(--muted)}
+.cmp{display:grid;gap:14px}
+.cmp .pair{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:6px 0;border-bottom:1px solid var(--line)}
+.cmp .pair .alt{color:var(--muted)}
+.cmp .pair .alt sup{color:var(--muted);font-family:var(--font-body);font-size:.6em;font-weight:700;margin:0 3px 0 2px;vertical-align:.45em}
+.cmp .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:520px){.cmp .pair{grid-template-columns:1fr;gap:4px}}
+.pager{display:flex;justify-content:space-between;gap:12px;margin-top:28px}
+.loading{padding:40px 0;text-align:center;color:var(--muted)}
+
+/* Search */
+.searchbox{display:flex;gap:8px;margin-bottom:10px}
+.searchbox input{flex:1;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:11px 14px;font-size:16px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:6px 12px;font-size:13px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.results{display:grid;gap:4px;margin-top:12px}
+.res{display:block;text-align:left;width:100%;background:none;border:0;border-bottom:1px solid var(--line);padding:12px 2px}
+.res .ref{font-weight:700;font-size:14px;color:var(--accent)}
+.res .t{font-family:var(--font-display);font-size:17px;line-height:1.55;margin-top:2px}
+.res mark{background:var(--hl-y);color:inherit;border-radius:3px;padding:0 1px}
+.res .note{font-family:var(--font-body);font-size:15px;margin-top:6px;padding:8px 10px;background:var(--accent-soft);border-radius:8px;white-space:pre-wrap}
+.swatch{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+/* Sheets */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;z-index:20}
+.scrim.on{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-width:760px;margin:0 auto;background:var(--surface);border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));z-index:21;max-height:85%;overflow-y:auto;display:none;box-shadow:0 -8px 30px rgba(0,0,0,.18)}
+.sheet.on{display:block}
+.sheet h3{font-size:17px;margin-bottom:12px;font-family:var(--font-body)}
+.sheethead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.grid-books{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;margin:8px 0 18px}
+.grid-books button,.grid-ch button{border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:10px 8px;text-align:left;font-size:14px;font-weight:500}
+.grid-books button[aria-current="true"],.grid-ch button[aria-current="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.grid-ch{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px}
+.grid-ch button{text-align:center;font-variant-numeric:tabular-nums}
+.colors{display:flex;gap:10px;margin:4px 0 14px}
+.colors button{width:38px;height:38px;border-radius:50%;border:2px solid var(--line)}
+.colors button.none{background:var(--paper);display:grid;place-items:center;color:var(--muted)}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.actions button{border:1px solid var(--line);background:var(--paper);border-radius:12px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px;font-weight:600}
+.actions svg{width:20px;height:20px}
+textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var(--paper);border-radius:12px;padding:10px 12px;font-size:16px;resize:vertical}
+.copyfallback{width:100%;min-height:120px}
+/* AI: Paliwanag at Sermon (2026-11-19) */
+.aibtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.aibtns button{border:1px solid var(--accent);background:var(--accent-soft);border-radius:12px;padding:11px 8px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:14px;font-weight:700;color:var(--ink)}
+.aibtns svg{width:18px;height:18px;color:var(--accent)}
+#aiSheet{max-height:92%}
+.aibar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.aibody{font-size:16px;line-height:1.65}
+.aibody h4{font-family:var(--font-display);font-size:18px;margin:18px 0 6px}
+.aibody h4:first-child{margin-top:4px}
+.aibody p{margin:0 0 10px}
+.aibody ul,.aibody ol{margin:0 0 10px;padding-left:22px}
+.aibody li{margin-bottom:4px}
+.aibody .vq{font-family:var(--font-display);border-left:3px solid var(--accent);padding:4px 0 4px 12px;margin:0 0 14px;color:var(--ink)}
+.aibody .src{font-size:13px;color:var(--muted);margin-top:12px}
+.ainote{font-size:13px;color:var(--muted);background:var(--accent-soft);border-radius:10px;padding:8px 10px;margin-top:14px}
+.aiacts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:12px}
+.spin{display:inline-block;width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;vertical-align:-4px;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:999px;font-weight:600;font-size:14px;z-index:30;display:none}
+.toast.on{display:block}
+
+/* Settings */
+.set{display:grid;gap:18px}
+.set .item{display:grid;gap:8px}
+.set input[type=range]{width:100%;accent-color:var(--accent)}
+.preview{font-family:var(--font-display);font-size:var(--read-size);line-height:1.7;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+.about{font-size:14px;color:var(--muted);line-height:1.6}
+.btn.danger-btn{background:#b5483b;color:#fff}
+.danger{background:none;border:1px solid #b5483b;color:#b5483b;border-radius:12px;padding:10px 14px;font-weight:600}
+@media (prefers-reduced-motion: no-preference){.sheet.on{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <button class="iconbtn" id="btnPrevTop" aria-label="Nakaraang kabanata" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="title" id="topTitle">Bibliya</div>
+    <button class="iconbtn" id="btnNextTop" aria-label="Susunod na kabanata" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button>
+    <button class="iconbtn" id="btnSettings" aria-label="Ayos ng app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </header>
+
+  <main class="main" id="main">
+    <!-- HOME -->
+    <section class="view" id="v-ngayon" aria-label="Ngayon">
+      <div class="date" id="today"></div>
+      <div class="stack">
+        <article class="votd" aria-labelledby="votdLabel">
+          <div class="label" id="votdLabel">Talata para sa araw na ito</div>
+          <blockquote id="votdText" class="loading">Kinukuha ang talata…</blockquote>
+          <div class="row" style="justify-content:space-between">
+            <span class="ref" id="votdRef"></span>
+            <div class="row">
+              <button class="btn small ghost" id="votdCopy">Kopyahin</button>
+              <button class="btn small" id="votdRead">Basahin ang kabanata</button>
+            </div>
+          </div>
+        </article>
+        <div class="card">
+          <button class="linkrow" id="continueBtn">
+            <div><div class="label">Ituloy ang pagbasa</div><h2 id="continueRef" style="margin-top:4px">Juan 1</h2></div>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+        <div class="card">
+          <div class="label">Mabilis na hanap</div>
+          <form class="searchbox" id="homeSearch" style="margin:0">
+            <input id="homeQ" type="search" placeholder="Hal. Juan 3:16 o pag-ibig" aria-label="Hanapin">
+            <button class="btn" type="submit">Hanapin</button>
+          </form>
+        </div>
+        <div class="card" id="recentCard">
+          <div class="label">Huling na-save</div>
+          <div id="recentList" class="results" style="margin-top:0"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- READER -->
+    <section class="view" id="v-basahin" aria-label="Basahin">
+      <div class="readerbar">
+        <button class="chip" id="pickBtn"><span id="pickLabel">Juan 1</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button>
+        <select id="verSel" aria-label="Bersiyon"></select>
+        <select id="cmpSel" aria-label="Ikumpara sa"></select>
+      </div>
+      <div class="chaphead"><h1 id="chapBook">Juan</h1><span class="num" id="chapNum">1</span></div>
+      <div id="chapter" class="text"></div>
+      <div class="pager">
+        <button class="btn ghost" id="prevBtn">‹ Nakaraan</button>
+        <button class="btn ghost" id="nextBtn">Susunod ›</button>
+      </div>
+    </section>
+
+    <!-- SEARCH -->
+    <section class="view" id="v-hanapin" aria-label="Hanapin">
+      <form class="searchbox" id="searchForm">
+        <input id="q" type="search" placeholder="Salita o talata (hal. Awit 23)" aria-label="Hanapin" autocomplete="off">
+        <button class="btn" type="submit">Hanapin</button>
+      </form>
+      <div class="row">
+        <div class="seg" role="group" aria-label="Saan hahanapin" id="scopeSeg">
+          <button type="button" data-scope="all" aria-pressed="true">Lahat</button>
+          <button type="button" data-scope="ot" aria-pressed="false">Lumang Tipan</button>
+          <button type="button" data-scope="nt" aria-pressed="false">Bagong Tipan</button>
+        </div>
+        <span class="muted" id="searchVer" style="font-size:13px"></span>
+      </div>
+      <div id="searchInfo" class="muted" style="margin-top:12px;font-size:14px">Mag-type ng salita (hal. <b>pananampalataya</b>) o ng talata (hal. <b>Roma 8:28</b>).</div>
+      <div id="results" class="results"></div>
+    </section>
+
+    <!-- SAVED -->
+    <section class="view" id="v-naka-save" aria-label="Naka-save">
+      <div class="seg" role="group" aria-label="Uri" id="savedSeg">
+        <button type="button" data-k="bm" aria-pressed="true">Bookmark</button>
+        <button type="button" data-k="hl" aria-pressed="false">Highlight</button>
+        <button type="button" data-k="notes" aria-pressed="false">Notes</button>
+      </div>
+      <div id="savedList" class="results"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="view" id="v-ayos" aria-label="Ayos">
+      <div class="set">
+        <div class="item">
+          <label class="label" for="fontRange">Laki ng letra</label>
+          <input type="range" id="fontRange" min="15" max="30" step="1">
+          <div class="preview">Ang Panginoon ang aking pastor; hindi ako mangangailangan.</div>
+        </div>
+        <div class="item">
+          <span class="label">Kulay ng screen</span>
+          <div class="seg" role="group" aria-label="Kulay ng screen" id="themeSeg">
+            <button type="button" data-t="auto" aria-pressed="true">Awtomatiko</button>
+            <button type="button" data-t="light" aria-pressed="false">Maliwanag</button>
+            <button type="button" data-t="dark" aria-pressed="false">Madilim</button>
+          </div>
+        </div>
+        <div class="item">
+          <span class="label">Mga bersiyon</span>
+          <div class="about">
+            <b>ADB</b> · Ang Dating Biblia (1905), Philippine Bible Society. Public domain.<br>
+            <b>KJV</b> · King James Version (1769). Public domain.<br>
+            <b>WEB</b> · World English Bible. Public domain.
+          </div>
+        </div>
+        <div class="item">
+          <span class="label">Iyong data</span>
+          <div class="about">Ang bookmarks, highlights at notes ay naka-save lang sa browser ng phone na ito. Walang account at walang ipinapadala kahit saan. Kapag binura ang browser data, mawawala rin ang mga ito.</div>
+          <div class="about">Kapag pinindot ang <b>Ipaliwanag</b> o <b>Gawan ng sermon</b>, ang napiling talata lang ang ipinapadala sa AI (Google Gemini) para gawin ang sagot. Gawa ng AI ang sagot kaya pwedeng magkamali: ikumpara sa Bibliya at itanong sa pastor. Ang <b>Matthew Henry</b> ay lumang komentaryo (1706, public domain), English lang.</div>
+          <div><button class="danger" id="clearBtn">Burahin ang lahat ng na-save</button></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="nav" aria-label="Pangunahing menu">
+    <button data-view="ngayon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Ngayon</button>
+    <button data-view="basahin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z"/></svg>Basahin</button>
+    <button data-view="hanapin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Hanapin</button>
+    <button data-view="naka-save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Naka-save</button>
+  </nav>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<!-- Book/chapter picker -->
+<div class="sheet" id="pickSheet" role="dialog" aria-label="Pumili ng aklat at kabanata">
+  <div class="sheethead"><h3 id="pickTitle">Pumili ng aklat</h3><button class="btn small ghost" data-close>Isara</button></div>
+  <div id="pickBody"></div>
+</div>
+
+<!-- Verse actions -->
+<div class="sheet" id="actSheet" role="dialog" aria-label="Gawin sa talata">
+  <div class="sheethead"><h3 id="actTitle">Juan 3:16</h3><button class="btn small ghost" id="actDone">Tapos</button></div>
+  <div class="label">Highlight</div>
+  <div class="colors" id="colors">
+    <button data-c="y" style="background:var(--hl-y)" aria-label="Dilaw"></button>
+    <button data-c="g" style="background:var(--hl-g)" aria-label="Berde"></button>
+    <button data-c="b" style="background:var(--hl-b)" aria-label="Asul"></button>
+    <button data-c="p" style="background:var(--hl-p)" aria-label="Rosas"></button>
+    <button data-c="" class="none" aria-label="Alisin ang highlight">✕</button>
+  </div>
+  <div class="actions">
+    <button id="actBm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg><span>Bookmark</span></button>
+    <button id="actNote"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg><span>Note</span></button>
+    <button id="actCopy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg><span>Kopyahin</span></button>
+  </div>
+  <div class="aibtns">
+    <button id="actExplain"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg>Ipaliwanag</button>
+    <button id="actSermon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg>Gawan ng sermon</button>
+  </div>
+  <div id="noteWrap" hidden style="margin-top:14px">
+    <label class="label" for="noteText">Note para sa <span id="noteRef"></span></label>
+    <textarea id="noteText" style="margin-top:6px" placeholder="Isulat ang iniisip mo, aral, o punto para sa sermon…"></textarea>
+    <div class="row" style="margin-top:8px;justify-content:flex-end">
+      <button class="btn small ghost" id="noteDel">Burahin</button>
+      <button class="btn small" id="noteSave">I-save ang note</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI: Paliwanag / Sermon / Matthew Henry -->
+<div class="sheet" id="aiSheet" role="dialog" aria-labelledby="aiTitle">
+  <div class="sheethead"><h3 id="aiTitle" style="margin:0">Paliwanag</h3><button class="btn small ghost" data-close>Isara</button></div>
+  <div class="aibar">
+    <div class="seg" role="group" aria-label="Uri" id="aiModeSeg">
+      <button type="button" data-m="explain" aria-pressed="true">Paliwanag</button>
+      <button type="button" data-m="sermon" aria-pressed="false">Sermon</button>
+      <button type="button" data-m="mh" aria-pressed="false">Matthew Henry</button>
+    </div>
+    <div class="seg" role="group" aria-label="Wika" id="aiLangSeg">
+      <button type="button" data-l="tl" aria-pressed="true">Tagalog</button>
+      <button type="button" data-l="en" aria-pressed="false">English</button>
+    </div>
+  </div>
+  <div id="aiBody" class="aibody" aria-live="polite"></div>
+  <div class="aiacts" id="aiActs" hidden>
+    <button class="btn small ghost" id="aiRetry" hidden>Subukan ulit</button>
+    <button class="btn small ghost" id="aiCopy">Kopyahin</button>
+    <button class="btn small" id="aiSave">I-save sa notes</button>
+  </div>
+  <div class="ainote" id="aiNote"></div>
+</div>
+
+<!-- Generic dialog (confirm / copy fallback) -->
+<div class="sheet" id="dlgSheet" role="dialog" aria-labelledby="dlgTitle">
+  <h3 id="dlgTitle"></h3>
+  <div id="dlgBody"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:12px" id="dlgBtns"></div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+"use strict";
+const BOOKS = [
+ ["Genesis","Genesis","Gen"],["Exodus","Exodo","Exo"],["Leviticus","Levitico","Lev"],["Numbers","Mga Bilang","Bil"],["Deuteronomy","Deuteronomio","Deut"],
+ ["Joshua","Josue","Jos"],["Judges","Mga Hukom","Huk"],["Ruth","Ruth","Ruth"],["1 Samuel","1 Samuel","1 Sam"],["2 Samuel","2 Samuel","2 Sam"],
+ ["1 Kings","1 Mga Hari","1 Hari"],["2 Kings","2 Mga Hari","2 Hari"],["1 Chronicles","1 Mga Cronica","1 Cro"],["2 Chronicles","2 Mga Cronica","2 Cro"],["Ezra","Ezra","Ezra"],
+ ["Nehemiah","Nehemias","Neh"],["Esther","Esther","Est"],["Job","Job","Job"],["Psalms","Mga Awit","Awit"],["Proverbs","Mga Kawikaan","Kaw"],
+ ["Ecclesiastes","Eclesiastes","Ecl"],["Song of Solomon","Awit ng mga Awit","AwA"],["Isaiah","Isaias","Isa"],["Jeremiah","Jeremias","Jer"],["Lamentations","Mga Panaghoy","Pan"],
+ ["Ezekiel","Ezekiel","Eze"],["Daniel","Daniel","Dan"],["Hosea","Oseas","Os"],["Joel","Joel","Joel"],["Amos","Amos","Amos"],
+ ["Obadiah","Obadias","Abd"],["Jonah","Jonas","Jon"],["Micah","Mikas","Mik"],["Nahum","Nahum","Nah"],["Habakkuk","Habacuc","Hab"],
+ ["Zephaniah","Sofonias","Sof"],["Haggai","Hageo","Hag"],["Zechariah","Zacarias","Zac"],["Malachi","Malakias","Mal"],
+ ["Matthew","Mateo","Mat"],["Mark","Marcos","Mar"],["Luke","Lucas","Luc"],["John","Juan","Juan"],["Acts","Mga Gawa","Gawa"],
+ ["Romans","Roma","Rom"],["1 Corinthians","1 Corinto","1 Cor"],["2 Corinthians","2 Corinto","2 Cor"],["Galatians","Galacia","Gal"],["Ephesians","Efeso","Efe"],
+ ["Philippians","Filipos","Fil"],["Colossians","Colosas","Col"],["1 Thessalonians","1 Tesalonica","1 Tes"],["2 Thessalonians","2 Tesalonica","2 Tes"],["1 Timothy","1 Timoteo","1 Tim"],
+ ["2 Timothy","2 Timoteo","2 Tim"],["Titus","Tito","Tito"],["Philemon","Filemon","Flm"],["Hebrews","Hebreo","Heb"],["James","Santiago","Stgo"],
+ ["1 Peter","1 Pedro","1 Ped"],["2 Peter","2 Pedro","2 Ped"],["1 John","1 Juan","1 Juan"],["2 John","2 Juan","2 Juan"],["3 John","3 Juan","3 Juan"],
+ ["Jude","Judas","Jud"],["Revelation","Apocalipsis","Apoc"]
+];
+const VERS = {adb:{name:"ADB",full:"Ang Dating Biblia (1905)",tl:true},kjv:{name:"KJV",full:"King James Version",tl:false},web:{name:"WEB",full:"World English Bible",tl:false}};
+const VOTD = [[0,1,1,1],[0,1,27,27],[0,2,18,18],[0,12,2,2],[0,18,14,14],[0,28,15,15],[0,50,20,20],[1,14,14,14],[1,15,2,2],[1,20,12,12],[1,33,14,14],[3,6,24,26],[3,23,19,19],[4,6,5,5],[4,7,9,9],[4,31,6,6],[4,31,8,8],[5,1,8,8],[5,1,9,9],[5,24,15,15],[7,1,16,16],[8,12,24,24],[8,16,7,7],[9,22,31,31],[10,8,56,56],[12,16,11,11],[12,16,34,34],[12,29,11,11],[13,7,14,14],[13,15,7,7],[13,16,9,9],[15,8,10,10],[16,4,14,14],[17,19,25,25],[17,23,10,10],[17,42,2,2],[18,1,1,2],[18,3,3,3],[18,4,8,8],[18,5,3,3],[18,9,10,10],[18,16,8,8],[18,16,11,11],[18,18,2,2],[18,19,1,1],[18,19,14,14],[18,23,1,1],[18,23,4,4],[18,23,6,6],[18,25,4,5],[18,27,1,1],[18,27,14,14],[18,28,7,7],[18,29,11,11],[18,30,5,5],[18,31,24,24],[18,32,8,8],[18,33,4,4],[18,34,4,4],[18,34,8,8],[18,34,18,18],[18,37,4,4],[18,37,5,5],[18,37,7,7],[18,40,1,1],[18,42,11,11],[18,46,1,1],[18,46,10,10],[18,51,10,10],[18,55,22,22],[18,56,3,3],[18,59,16,16],[18,62,1,1],[18,62,8,8],[18,63,1,1],[18,63,3,3],[18,66,20,20],[18,68,19,19],[18,71,5,5],[18,73,26,26],[18,84,11,11],[18,86,5,5],[18,90,12,12],[18,91,1,2],[18,91,11,11],[18,94,19,19],[18,95,6,6],[18,100,4,5],[18,103,1,2],[18,103,12,12],[18,107,1,1],[18,112,7,7],[18,118,6,6],[18,118,24,24],[18,119,11,11],[18,119,105,105],[18,119,114,114],[18,121,1,2],[18,121,7,8],[18,126,5,5],[18,127,1,1],[18,133,1,1],[18,136,1,1],[18,138,8,8],[18,139,14,14],[18,139,23,24],[18,143,8,8],[18,145,18,18],[18,147,3,3],[18,150,6,6],[19,3,5,6],[19,3,9,9],[19,4,23,23],[19,9,10,10],[19,10,12,12],[19,11,25,25],[19,12,25,25],[19,15,1,1],[19,16,3,3],[19,16,9,9],[19,17,17,17],[19,17,22,22],[19,18,10,10],[19,18,24,24],[19,19,21,21],[19,22,6,6],[19,27,17,17],[19,28,13,13],[19,31,25,25],[19,31,30,30],[20,3,1,1],[20,3,11,11],[20,4,9,10],[20,4,12,12],[20,12,13,13],[21,8,7,7],[22,1,18,18],[22,6,8,8],[22,9,6,6],[22,12,2,2],[22,26,3,3],[22,26,4,4],[22,30,15,15],[22,30,21,21],[22,40,8,8],[22,40,29,29],[22,40,31,31],[22,41,10,10],[22,41,13,13],[22,43,1,1],[22,43,2,2],[22,43,18,19],[22,49,15,15],[22,53,5,5],[22,54,10,10],[22,55,6,6],[22,55,8,9],[22,55,11,11],[22,58,11,11],[22,60,1,1],[22,61,1,1],[22,64,8,8],[22,65,24,24],[23,1,5,5],[23,17,7,7],[23,29,11,11],[23,29,13,13],[23,31,3,3],[23,32,17,17],[23,33,3,3],[24,3,22,23],[24,3,25,25],[25,36,26,26],[26,2,22,22],[26,3,17,17],[26,12,3,3],[27,6,3,3],[27,10,12,12],[28,2,13,13],[28,2,25,25],[29,5,24,24],[31,2,2,2],[32,6,8,8],[32,7,7,7],[32,7,18,18],[33,1,7,7],[34,2,3,3],[34,3,17,18],[34,3,19,19],[35,3,17,17],[36,2,4,4],[37,4,6,6],[38,3,6,6],[38,3,10,10],[39,4,4,4],[39,4,19,19],[39,5,3,3],[39,5,4,4],[39,5,8,8],[39,5,9,9],[39,5,14,14],[39,5,16,16],[39,5,44,44],[39,6,6,6],[39,6,20,21],[39,6,33,33],[39,6,34,34],[39,7,7,7],[39,7,12,12],[39,9,37,38],[39,11,28,28],[39,11,29,30],[39,16,24,24],[39,17,20,20],[39,18,20,20],[39,19,26,26],[39,22,37,39],[39,24,35,35],[39,25,40,40],[39,28,19,19],[39,28,20,20],[40,9,23,23],[40,10,27,27],[40,10,45,45],[40,11,24,24],[40,12,30,30],[40,16,15,15],[41,1,37,37],[41,1,45,45],[41,2,10,11],[41,6,31,31],[41,6,38,38],[41,9,23,23],[41,10,27,27],[41,11,9,9],[41,12,7,7],[41,12,32,32],[41,15,7,7],[41,16,10,10],[41,19,10,10],[42,1,1,1],[42,1,5,5],[42,1,12,12],[42,1,14,14],[42,3,16,16],[42,3,17,17],[42,3,30,30],[42,4,24,24],[42,5,24,24],[42,6,35,35],[42,8,12,12],[42,8,32,32],[42,8,36,36],[42,10,10,10],[42,10,11,11],[42,10,27,28],[42,11,25,25],[42,13,34,34],[42,13,35,35],[42,14,1,1],[42,14,6,6],[42,14,15,15],[42,14,27,27],[42,15,5,5],[42,15,7,7],[42,15,12,12],[42,15,13,13],[42,15,16,16],[42,16,33,33],[42,17,17,17],[42,20,29,29],[43,1,8,8],[43,2,38,38],[43,4,12,12],[43,16,31,31],[43,17,28,28],[43,20,24,24],[43,20,35,35],[44,1,16,16],[44,3,23,23],[44,5,1,1],[44,5,3,4],[44,5,5,5],[44,5,8,8],[44,6,23,23],[44,8,1,1],[44,8,18,18],[44,8,26,26],[44,8,28,28],[44,8,31,31],[44,8,37,37],[44,8,38,39],[44,10,9,9],[44,10,17,17],[44,12,1,1],[44,12,2,2],[44,12,10,10],[44,12,12,12],[44,12,21,21],[44,13,8,8],[44,15,4,4],[44,15,13,13],[45,2,9,9],[45,6,19,20],[45,10,13,13],[45,10,31,31],[45,13,4,5],[45,13,7,7],[45,13,13,13],[45,15,57,57],[45,15,58,58],[45,16,13,14],[46,1,3,4],[46,3,17,17],[46,4,16,16],[46,4,17,18],[46,5,7,7],[46,5,17,17],[46,5,21,21],[46,9,7,7],[46,9,8,8],[46,12,9,9],[47,2,20,20],[47,5,1,1],[47,5,13,13],[47,5,22,23],[47,6,2,2],[47,6,9,9],[48,2,8,9],[48,2,10,10],[48,3,20,20],[48,4,2,2],[48,4,26,26],[48,4,29,29],[48,4,32,32],[48,5,2,2],[48,6,10,10],[48,6,11,11],[49,1,6,6],[49,1,21,21],[49,2,3,3],[49,2,4,4],[49,2,13,13],[49,3,13,14],[49,4,4,4],[49,4,6,6],[49,4,7,7],[49,4,8,8],[49,4,13,13],[49,4,19,19],[50,1,17,17],[50,2,6,7],[50,3,2,2],[50,3,12,12],[50,3,13,13],[50,3,15,15],[50,3,17,17],[50,3,23,23],[50,4,2,2],[51,5,11,11],[51,5,16,18],[51,5,24,24],[52,3,3,3],[52,3,16,16],[53,4,12,12],[53,6,6,6],[53,6,12,12],[54,1,7,7],[54,2,15,15],[54,3,16,16],[54,4,7,7],[55,2,11,11],[55,3,5,5],[57,4,12,12],[57,4,16,16],[57,6,19,19],[57,10,23,23],[57,10,24,25],[57,11,1,1],[57,11,6,6],[57,12,1,1],[57,12,2,2],[57,12,11,11],[57,13,5,5],[57,13,6,6],[57,13,8,8],[57,13,16,16],[58,1,2,3],[58,1,5,5],[58,1,12,12],[58,1,17,17],[58,1,19,19],[58,1,22,22],[58,2,17,17],[58,4,7,7],[58,4,8,8],[58,4,10,10],[58,5,16,16],[59,2,9,9],[59,3,15,15],[59,4,8,8],[59,4,10,10],[59,5,6,7],[59,5,8,8],[59,5,10,10],[60,1,3,3],[60,3,9,9],[61,1,7,7],[61,1,9,9],[61,3,1,1],[61,3,18,18],[61,4,4,4],[61,4,7,7],[61,4,8,8],[61,4,10,10],[61,4,18,18],[61,4,19,19],[61,5,4,4],[61,5,14,14],[63,1,2,2],[64,1,24,24],[65,3,20,20],[65,21,4,4],[65,21,5,5],[65,22,13,13]];
+const EXTRA_ALIASES = {
+  "gn":0,"gen":0,"ex":1,"exo":1,"exod":1,"lv":2,"lev":2,"num":3,"bilang":3,"dt":4,"deut":4,"jos":5,"josh":5,"jdg":6,"judg":6,"hukom":6,"rt":7,
+  "ps":18,"psa":18,"psalm":18,"salmo":18,"mga salmo":18,"awit":18,"pr":19,"prov":19,"kawikaan":19,"kaw":19,"ecc":20,"eccl":20,"song":21,"songs":21,"song of songs":21,"sos":21,"awa":21,
+  "is":22,"isa":22,"jer":23,"lam":24,"panaghoy":24,"ezek":25,"eze":25,"dan":26,"hos":27,"ob":30,"obad":30,"jon":31,"mic":32,"mik":32,"hab":34,"zeph":35,"hag":36,"zech":37,"mal":38,
+  "mt":39,"matt":39,"mat":39,"mk":40,"mrk":40,"mar":40,"lk":41,"luk":41,"jn":42,"jhn":42,"act":43,"gawa":43,"mga gawa":43,"rom":44,"ro":44,"gal":47,"eph":48,"efe":48,"phil":49,"php":49,"fil":49,"col":50,
+  "tit":55,"phm":56,"philem":56,"heb":57,"jas":58,"jm":58,"stgo":58,"jud":64,"rev":65,"revelation of john":65,"apoc":65,"pahayag":65
+};
+const NUM_ALIASES = {"sam":8,"samuel":8,"kgs":10,"ki":10,"kings":10,"hari":10,"mga hari":10,"chr":12,"chron":12,"chronicles":12,"cro":12,"cronica":12,"mga cronica":12,
+  "cor":45,"corinthians":45,"corinto":45,"th":51,"thess":51,"thessalonians":51,"tes":51,"tesalonica":51,"tim":53,"timothy":53,"timoteo":53,"pet":59,"pt":59,"peter":59,"ped":59,"pedro":59,"jn":61,"john":61,"juan":61};
+
+/* ---------- storage ---------- */
+const store = {
+  get(k,d){try{const v=localStorage.getItem("bib."+k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem("bib."+k,JSON.stringify(v))}catch(e){}}
+};
+const S = Object.assign({ver:"adb",cmp:"",book:42,chap:1,font:19,theme:"auto",scope:"all",savedTab:"bm"}, store.get("set",{}));
+let HL = store.get("hl",{}), BM = store.get("bm",{}), NOTES = store.get("notes",{});
+function saveSettings(){store.set("set",S)}
+
+/* ---------- helpers ---------- */
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fold = s=>s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+const bookName = (b,ver)=>BOOKS[b][VERS[ver||S.ver].tl?1:0];
+const refStr = (b,c,v,w,ver)=>bookName(b,ver)+" "+c+(v?":"+v+(w&&w!==v?"-"+w:""):"");
+const key = (b,c,v)=>b+"."+c+"."+v;
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove("on"),1800)}
+
+/* ---------- data ---------- */
+const DATA = {}, LOADING = {};
+function load(ver){
+  if(DATA[ver]) return Promise.resolve(DATA[ver]);
+  if(!LOADING[ver]) LOADING[ver] = fetch("data/"+ver+".json").then(r=>{if(!r.ok) throw new Error(r.status);return r.json()}).then(d=>{DATA[ver]=d;return d}).catch(e=>{delete LOADING[ver];throw e});
+  return LOADING[ver];
+}
+
+/* ---------- reference parser ---------- */
+const ALIAS = {};
+BOOKS.forEach((b,i)=>{[b[0],b[1],b[2]].forEach(n=>{ALIAS[fold(n).replace(/\./g,"")]=i;ALIAS[fold(n).replace(/^mga /,"").replace(/ ng mga /," ng mga ")]=i})});
+Object.entries(EXTRA_ALIASES).forEach(([k,v])=>ALIAS[k]=v);
+function findBook(name,exact){
+  name = fold(name).replace(/\./g,"").replace(/\s+/g," ").trim();
+  name = name.replace(/^(iii|ii|i|una|ika-?2|ikalawang|ikatlong)\s+/,m=>({"iii ":"3 ","ii ":"2 ","i ":"1 ","una ":"1 ","ikalawang ":"2 ","ikatlong ":"3 "}[m]||m.replace(/ika-?2/,"2")));
+  name = name.replace(/^([123])\s*/,"$1 ");
+  if(name in ALIAS) return ALIAS[name];
+  const m = name.match(/^([123]) (.+)$/);
+  if(m && (m[2] in NUM_ALIASES)) return NUM_ALIASES[m[2]] + (+m[1]-1);
+  if(exact||name.length<2) return -1;
+  // prefix match on english/tagalog names
+  for(let i=0;i<BOOKS.length;i++){
+    for(const n of [BOOKS[i][0],BOOKS[i][1],BOOKS[i][1].replace(/^(\d )?Mga /,"$1")]){
+      if(fold(n).startsWith(name)) return i;
+    }
+  }
+  return -1;
+}
+function parseRef(q){
+  const m = q.trim().match(/^(.*?[a-zA-ZÀ-ÿ].*?)\s*(\d+)?(?:\s*[:.]\s*(\d+)(?:\s*-\s*(\d+))?)?$/);
+  if(!m) return null;
+  const b = findBook(m[1],!m[2]); if(b<0) return null;
+  const c = m[2]? +m[2] : 1, v = m[3]? +m[3] : 0, w = m[4]? +m[4] : v;
+  if(!m[2] && m[3]) return null;
+  return {b,c,v,w};
+}
+
+/* ---------- views / routing ---------- */
+const VIEWS = ["ngayon","basahin","hanapin","naka-save","ayos"];
+function show(view){
+  if(!VIEWS.includes(view)) view="ngayon";
+  document.querySelectorAll(".view").forEach(el=>el.classList.toggle("on",el.id==="v-"+view));
+  document.querySelectorAll(".nav button").forEach(b=>{if(b.dataset.view===view)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current")});
+  const reading = view==="basahin";
+  $("#btnPrevTop").hidden = $("#btnNextTop").hidden = !reading;
+  $("#topTitle").textContent = {ngayon:"Bibliya",basahin:refStr(S.book,S.chap),hanapin:"Hanapin","naka-save":"Naka-save",ayos:"Ayos"}[view];
+  current = view;
+  if(view==="ngayon") renderHome();
+  if(view==="basahin") renderChapter();
+  if(view==="naka-save") renderSaved();
+  if(view==="hanapin") $("#searchVer").textContent = "sa "+VERS[S.ver].name;
+  $("#main").scrollTop = 0;
+}
+let current = "ngayon";
+function go(view){ if(location.hash.slice(1)===view) show(view); else location.hash = view; }
+window.addEventListener("hashchange",()=>show(location.hash.slice(1)));
+document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.view)));
+$("#btnSettings").addEventListener("click",()=>go("ayos"));
+
+/* ---------- home ---------- */
+const MONTHS=["Enero","Pebrero","Marso","Abril","Mayo","Hunyo","Hulyo","Agosto","Setyembre","Oktubre","Nobyembre","Disyembre"];
+const DAYS=["Linggo","Lunes","Martes","Miyerkules","Huwebes","Biyernes","Sabado"];
+function votdToday(){
+  const d=new Date(); const day=Math.floor((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()))/864e5);
+  return VOTD[((day*7)%VOTD.length+VOTD.length)%VOTD.length];
+}
+function verseText(data,b,c,v,w){const out=[];for(let i=v;i<=w;i++){const t=data[b][c-1][i-1];if(t) out.push(t)}return out.join(" ")}
+async function renderHome(){
+  const d=new Date();
+  $("#today").textContent = DAYS[d.getDay()]+", "+d.getDate()+" "+MONTHS[d.getMonth()]+" "+d.getFullYear();
+  const [b,c,v,w]=votdToday();
+  $("#votdRef").textContent = refStr(b,c,v,w)+" · "+VERS[S.ver].name;
+  $("#continueRef").textContent = refStr(S.book,S.chap);
+  try{
+    const data = await load(S.ver);
+    const el=$("#votdText"); el.classList.remove("loading"); el.textContent = "“"+verseText(data,b,c,v,w)+"”";
+  }catch(e){ $("#votdText").textContent="Hindi makuha ang talata. Paki-check ang internet at buksan ulit."; }
+  renderRecent();
+}
+async function renderRecent(){
+  const items = [...Object.entries(BM).map(([k,t])=>[k,t]),...Object.entries(NOTES).map(([k,n])=>[k,n.ts])].sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const card=$("#recentCard");
+  if(!items.length){card.hidden=true;return}
+  card.hidden=false;
+  const data = await load(S.ver).catch(()=>null);
+  $("#recentList").innerHTML = items.map(([k])=>resultHtml(k,data)).join("");
+}
+$("#votdRead").addEventListener("click",()=>{const [b,c,v]=votdToday();openAt(b,c,v)});
+$("#votdCopy").addEventListener("click",()=>{const [b,c,v,w]=votdToday();const data=DATA[S.ver];if(!data)return;copyText("“"+verseText(data,b,c,v,w)+"”\n— "+refStr(b,c,v,w)+" ("+VERS[S.ver].name+")")});
+$("#continueBtn").addEventListener("click",()=>go("basahin"));
+$("#homeSearch").addEventListener("submit",e=>{e.preventDefault();$("#q").value=$("#homeQ").value;go("hanapin");runSearch()});
+
+/* ---------- reader ---------- */
+let selected = []; // verse numbers
+let flashVerse = 0;
+function fillVersionSelects(){
+  $("#verSel").innerHTML = Object.entries(VERS).map(([k,v])=>`<option value="${k}" ${k===S.ver?"selected":""}>${v.name}</option>`).join("");
+  $("#cmpSel").innerHTML = `<option value="">Ikumpara…</option>`+Object.entries(VERS).filter(([k])=>k!==S.ver).map(([k,v])=>`<option value="${k}" ${k===S.cmp?"selected":""}>+ ${v.name}</option>`).join("");
+}
+$("#verSel").addEventListener("change",e=>{S.ver=e.target.value;if(S.cmp===S.ver)S.cmp="";saveSettings();fillVersionSelects();renderChapter()});
+$("#cmpSel").addEventListener("change",e=>{S.cmp=e.target.value;saveSettings();renderChapter()});
+function openAt(b,c,v){S.book=b;S.chap=c;saveSettings();flashVerse=v||0;selected=[];go("basahin")}
+async function renderChapter(){
+  const b=S.book,c=S.chap;
+  $("#pickLabel").textContent = refStr(b,c);
+  $("#topTitle").textContent = refStr(b,c);
+  $("#chapBook").textContent = bookName(b);
+  $("#chapNum").textContent = c;
+  const box=$("#chapter");
+  if(!DATA[S.ver] || (S.cmp && !DATA[S.cmp])) box.innerHTML='<div class="loading">Binubuksan ang '+VERS[S.ver].full+'…</div>';
+  let data,data2;
+  try{ data=await load(S.ver); if(S.cmp) data2=await load(S.cmp); }
+  catch(e){ box.innerHTML='<div class="loading">Hindi mabuksan ang Bibliya. Paki-check ang internet, tapos subukan ulit.</div>'; return; }
+  if(b!==S.book||c!==S.chap) return;
+  const verses=data[b][c-1];
+  const vs=(t,i,cls="")=>{
+    const k=key(b,c,i+1), h=HL[k], mark=(BM[k]||hasNote(b,c,i+1))?'<span class="mark" aria-label="may bookmark o note"></span>':"";
+    return `<span class="v ${cls} ${h?"hl-"+h:""} ${selected.includes(i+1)?"sel":""} ${t?"":"empty"}" data-v="${i+1}"><sup>${i+1}</sup>${t?esc(t):"— (wala ang talatang ito sa bersiyong ito)"}${mark}</span> `;
+  };
+  if(data2){
+    const v2=data2[b][c-1];
+    box.className="text cmp";
+    box.innerHTML = `<div class="cols label"><span>${VERS[S.ver].name}</span><span>${VERS[S.cmp].name}</span></div>`+
+      verses.map((t,i)=>`<div class="pair">${vs(t,i)}<span class="alt"><sup>${i+1}</sup>${esc(v2[i]||"—")}</span></div>`).join("");
+  }else{
+    box.className="text";
+    box.innerHTML = verses.map((t,i)=>vs(t,i)).join("");
+  }
+  $("#prevBtn").disabled = (b===0&&c===1);
+  $("#nextBtn").disabled = (b===65&&c===data[65].length);
+  S.lastRead=Date.now();saveSettings();
+  if(flashVerse){const el=box.querySelector(`[data-v="${flashVerse}"]`);if(el){el.scrollIntoView({block:"center"});el.classList.add("sel");setTimeout(()=>el.classList.remove("sel"),1600)} flashVerse=0}
+}
+function hasNote(b,c,v){const p=b+"."+c+".";for(const k in NOTES){if(k.startsWith(p)){const [s,e]=k.slice(p.length).split("-").map(Number);if(v>=s&&v<=(e||s))return true}}return false}
+function step(d){
+  const data=DATA[S.ver]; if(!data) return;
+  let b=S.book,c=S.chap+d;
+  if(c<1){if(b===0)return;b--;c=data[b].length}
+  else if(c>data[b].length){if(b===65)return;b++;c=1}
+  S.book=b;S.chap=c;selected=[];closeSheets();saveSettings();renderChapter();$("#main").scrollTop=0;
+}
+$("#prevBtn").addEventListener("click",()=>step(-1));
+$("#nextBtn").addEventListener("click",()=>step(1));
+$("#btnPrevTop").addEventListener("click",()=>step(-1));
+$("#btnNextTop").addEventListener("click",()=>step(1));
+document.addEventListener("keydown",e=>{
+  if(current!=="basahin"||/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))return;
+  if(e.key==="ArrowLeft")step(-1); if(e.key==="ArrowRight")step(1); if(e.key==="Escape")closeSheets();
+});
+$("#chapter").addEventListener("click",e=>{
+  const el=e.target.closest(".v"); if(!el) return;
+  const v=+el.dataset.v;
+  selected = selected.includes(v)? selected.filter(x=>x!==v) : [...selected,v].sort((a,b)=>a-b);
+  el.classList.toggle("sel",selected.includes(v));
+  if(selected.length) openActions(); else closeSheets();
+});
+
+/* ---------- picker ---------- */
+function openPicker(stage,b){
+  const body=$("#pickBody");
+  const data=DATA[S.ver];
+  if(stage==="ch" && data){
+    $("#pickTitle").textContent = bookName(b);
+    body.innerHTML = `<button class="btn small ghost" id="backBooks" style="margin-bottom:10px">‹ Mga aklat</button><div class="grid-ch">`+
+      data[b].map((_,i)=>`<button data-c="${i+1}" ${b===S.book&&i+1===S.chap?'aria-current="true"':""}>${i+1}</button>`).join("")+`</div>`;
+    $("#backBooks").onclick=()=>openPicker("books");
+    body.querySelectorAll("[data-c]").forEach(x=>x.onclick=()=>{closeSheets();openAt(b,+x.dataset.c)});
+  }else{
+    $("#pickTitle").textContent = "Pumili ng aklat";
+    const grid=(from,to)=>`<div class="grid-books">`+BOOKS.slice(from,to).map((_,j)=>{const i=from+j;return `<button data-b="${i}" ${i===S.book?'aria-current="true"':""}>${esc(bookName(i))}</button>`}).join("")+`</div>`;
+    body.innerHTML = `<div class="label">Lumang Tipan</div>`+grid(0,39)+`<div class="label">Bagong Tipan</div>`+grid(39,66);
+    body.querySelectorAll("[data-b]").forEach(x=>x.onclick=()=>openPicker("ch",+x.dataset.b));
+  }
+  openSheet("#pickSheet");
+}
+$("#pickBtn").addEventListener("click",()=>openPicker("books"));
+$("#topTitle").addEventListener("click",()=>{if(current==="basahin")openPicker("books")});
+
+/* ---------- sheets ---------- */
+function openSheet(id){document.querySelectorAll(".sheet").forEach(s=>s.classList.toggle("on","#"+s.id===id));$("#scrim").classList.add("on")}
+function closeSheets(){document.querySelectorAll(".sheet").forEach(s=>s.classList.remove("on"));$("#scrim").classList.remove("on");$("#noteWrap").hidden=true}
+$("#scrim").addEventListener("click",()=>{if($("#actSheet").classList.contains("on"))clearSelection();closeSheets()});
+document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",closeSheets));
+
+/* ---------- verse actions ---------- */
+function selRange(){return [selected[0],selected[selected.length-1]]}
+function selRef(){
+  const b=S.book,c=S.chap; const contiguous = selected.every((v,i)=>i===0||v===selected[i-1]+1);
+  return contiguous? refStr(b,c,selected[0],selected[selected.length-1]) : bookName(b)+" "+c+":"+selected.join(",");
+}
+function openActions(){
+  $("#actTitle").textContent = selRef();
+  const allBm = selected.every(v=>BM[key(S.book,S.chap,v)]);
+  $("#actBm span").textContent = allBm? "Alisin ang bookmark":"Bookmark";
+  $("#noteWrap").hidden=true;
+  if(!$("#actSheet").classList.contains("on")) openSheet("#actSheet");
+  $("#scrim").classList.remove("on"); // keep text visible & tappable
+}
+function clearSelection(){selected=[];document.querySelectorAll("#chapter .v.sel").forEach(x=>x.classList.remove("sel"))}
+$("#actDone").addEventListener("click",()=>{clearSelection();closeSheets()});
+$("#colors").addEventListener("click",e=>{
+  const btn=e.target.closest("button"); if(!btn) return;
+  selected.forEach(v=>{const k=key(S.book,S.chap,v); if(btn.dataset.c) HL[k]=btn.dataset.c; else delete HL[k]});
+  store.set("hl",HL); clearSelection(); closeSheets(); renderChapter();
+  toast(btn.dataset.c?"Na-highlight":"Inalis ang highlight");
+});
+$("#actBm").addEventListener("click",()=>{
+  const allBm = selected.every(v=>BM[key(S.book,S.chap,v)]);
+  selected.forEach(v=>{const k=key(S.book,S.chap,v); if(allBm) delete BM[k]; else BM[k]=Date.now()});
+  store.set("bm",BM); clearSelection(); closeSheets(); renderChapter();
+  toast(allBm?"Inalis ang bookmark":"Na-bookmark");
+});
+let noteKey="";
+$("#actNote").addEventListener("click",()=>{
+  const [s,e]=selRange(); noteKey = S.book+"."+S.chap+"."+s+(e!==s?"-"+e:"");
+  $("#noteRef").textContent = refStr(S.book,S.chap,s,e);
+  $("#noteText").value = NOTES[noteKey]?.t || "";
+  $("#noteDel").hidden = !NOTES[noteKey];
+  $("#noteWrap").hidden=false; $("#noteText").focus();
+});
+$("#noteSave").addEventListener("click",()=>{
+  const t=$("#noteText").value.trim();
+  if(t) NOTES[noteKey]={t,ts:Date.now(),ver:S.ver}; else delete NOTES[noteKey];
+  store.set("notes",NOTES); clearSelection(); closeSheets(); renderChapter(); toast(t?"Na-save ang note":"Walang laman, hindi na-save");
+});
+$("#noteDel").addEventListener("click",()=>{delete NOTES[noteKey];store.set("notes",NOTES);clearSelection();closeSheets();renderChapter();toast("Binura ang note")});
+$("#actCopy").addEventListener("click",()=>{
+  const data=DATA[S.ver]; const lines=selected.map(v=>(selected.length>1?v+" ":"")+(data[S.book][S.chap-1][v-1]||""));
+  copyText(lines.join(" ")+"\n— "+selRef()+" ("+VERS[S.ver].name+")");
+  clearSelection(); closeSheets();
+});
+function copyText(text){
+  const fallback=()=>dialog("Kopyahin ang talata",`<textarea class="copyfallback" readonly>${esc(text)}</textarea><p class="muted" style="font-size:14px">Pindutin nang matagal ang text sa itaas, tapos piliin ang Copy.</p>`,[["Isara",null]]);
+  try{ navigator.clipboard.writeText(text).then(()=>toast("Nakopya na"),fallback) }catch(e){ fallback() }
+}
+function dialog(title,html,buttons){
+  $("#dlgTitle").textContent=title; $("#dlgBody").innerHTML=html;
+  const wrap=$("#dlgBtns"); wrap.innerHTML="";
+  buttons.forEach(([label,fn,cls])=>{const b=document.createElement("button");b.className="btn small "+(cls||"ghost");b.textContent=label;b.onclick=()=>{closeSheets();fn&&fn()};wrap.appendChild(b)});
+  openSheet("#dlgSheet");
+}
+
+/* ---------- AI: Paliwanag / Sermon / Matthew Henry (2026-11-19) ---------- */
+const AI = {ctx:null, mode:"explain", lang:"tl", text:"", seq:0, mem:{}};
+function mdToHtml(md){
+  const inline=t=>esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g,"$1<i>$2</i>");
+  let html="", list="";
+  const close=()=>{if(list){html+="</"+list+">";list=""}};
+  for(const raw of md.replace(/\r/g,"").split("\n")){
+    const l=raw.trim(); let m;
+    if(!l){close();continue}
+    if((m=l.match(/^#{1,4}\s+(.*)$/))){close();html+="<h4>"+inline(m[1].replace(/\*\*/g,""))+"</h4>";continue}
+    if((m=l.match(/^[-*•]\s+(.*)$/))){if(list!=="ul"){close();html+="<ul>";list="ul"}html+="<li>"+inline(m[1])+"</li>";continue}
+    if((m=l.match(/^\d+[.)]\s+(.*)$/))){if(list!=="ol"){close();html+="<ol>";list="ol"}html+="<li>"+inline(m[1])+"</li>";continue}
+    close(); html+="<p>"+inline(l)+"</p>";
+  }
+  close(); return html;
+}
+function aiRefText(){const x=AI.ctx;const vs=x.verses;const contiguous=vs.every((v,i)=>i===0||v===vs[i-1]+1);return contiguous?refStr(x.b,x.c,vs[0],vs[vs.length-1],x.ver):bookName(x.b,x.ver)+" "+x.c+":"+vs.join(",")}
+function openAi(mode){
+  if(!selected.length) return;
+  if(selected.length>40){toast("Hanggang 40 talata lang ang pwede");return}
+  AI.ctx={b:S.book,c:S.chap,verses:[...selected],ver:S.ver};
+  AI.mode=mode; AI.lang=VERS[S.ver].tl?"tl":"en";
+  clearSelection(); openSheet("#aiSheet"); runAi();
+}
+function syncAiBar(){
+  syncSeg("#aiModeSeg","m",AI.mode); syncSeg("#aiLangSeg","l",AI.lang);
+  $("#aiLangSeg").hidden = AI.mode==="mh";
+  $("#aiTitle").textContent = {explain:"Paliwanag",sermon:"Sermon",mh:"Matthew Henry"}[AI.mode]+" · "+aiRefText();
+  $("#aiNote").innerHTML = AI.mode==="mh" ? "Lumang komentaryo (1706), English lang. Public domain." : "Gawa ng AI (Gemini) kaya pwedeng magkamali. Ikumpara sa Bibliya at itanong sa pastor bago ituro.";
+}
+async function runAi(){
+  syncAiBar();
+  const x=AI.ctx, seq=++AI.seq, body=$("#aiBody");
+  const memKey=[AI.mode,AI.mode==="mh"?"":AI.lang,x.ver,x.b,x.c,x.verses.join(",")].join("|");
+  AI.text=""; $("#aiActs").hidden=true; $("#aiRetry").hidden=true;
+  const data=DATA[x.ver];
+  const quote = data? `<div class="vq">${esc(x.verses.map(v=>(x.verses.length>1?v+" ":"")+(data[x.b][x.c-1][v-1]||"")).join(" "))}<div class="src">${esc(aiRefText())} (${VERS[x.ver].name})</div></div>` : "";
+  const show=(html,text)=>{ if(seq!==AI.seq) return; body.innerHTML=quote+html; AI.text=text||""; $("#aiActs").hidden=!text; $("#aiSave").hidden=$("#aiCopy").hidden=!text; };
+  const fail=(msg,offerMh)=>{ if(seq!==AI.seq) return; body.innerHTML=quote+`<p>${esc(msg)}</p>`+(offerMh?`<p><button class="btn small" id="aiToMh">Basahin ang Matthew Henry</button></p>`:"");
+    $("#aiActs").hidden=false; $("#aiRetry").hidden=false; $("#aiCopy").hidden=$("#aiSave").hidden=true;
+    const b=$("#aiToMh"); if(b) b.onclick=()=>{AI.mode="mh";runAi()}; };
+  if(AI.mem[memKey]){ const m=AI.mem[memKey]; show(m.html,m.text); return; }
+  body.innerHTML=quote+`<p class="muted"><span class="spin"></span>${AI.mode==="mh"?"Kinukuha ang komentaryo…":"Pinag-iisipan… (mga 10 hanggang 40 segundo)"}</p>`;
+  try{
+    if(AI.mode==="mh"){
+      const r=await fetch("api/commentary?b="+x.b+"&c="+x.c+"&verses="+x.verses.join(","));
+      const j=await r.json().catch(()=>({error:"Walang sagot ang server."}));
+      if(!r.ok) return fail(j.error||"Hindi makuha ang komentaryo.",false);
+      const ttl=refStr(x.b,x.c,0,0,"kjv");
+      const parts=j.parts.length? j.parts.map(p=>({h:ttl+":"+p.from+(p.to&&p.to!==p.from?"-"+p.to:""),t:p.text})) : [{h:ttl+" (panimula ng kabanata)",t:j.intro}];
+      const html=parts.map(p=>`<h4>${esc(p.h)}</h4><p>${esc(p.t)}</p>`).join("")+`<div class="src">${esc(j.source)}</div>`;
+      const text=parts.map(p=>p.h+"\n"+p.t).join("\n\n")+"\n\n— "+j.source;
+      AI.mem[memKey]={html,text}; return show(html,text);
+    }
+    const r=await fetch("api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:AI.mode,lang:AI.lang,ver:x.ver,b:x.b,c:x.c,verses:x.verses})});
+    const j=await r.json().catch(()=>({error:"Walang sagot ang server."}));
+    if(!r.ok) return fail(j.error||"May error ang AI.",true);
+    const html=mdToHtml(j.text);
+    AI.mem[memKey]={html,text:j.text}; show(html,j.text);
+  }catch(e){ fail(navigator.onLine===false?"Walang koneksyon. Kailangang naka-connect sa Wi-Fi kung nasaan ang server ng app.":"Hindi maabot ang server ng app. Siguraduhing bukas ang start-bible.cmd sa PC.",AI.mode!=="mh"); }
+}
+$("#actExplain").addEventListener("click",()=>openAi("explain"));
+$("#actSermon").addEventListener("click",()=>openAi("sermon"));
+$("#aiModeSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b||b.dataset.m===AI.mode)return;AI.mode=b.dataset.m;runAi()});
+$("#aiLangSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b||b.dataset.l===AI.lang)return;AI.lang=b.dataset.l;runAi()});
+$("#aiRetry").addEventListener("click",runAi);
+function aiPlain(){return AI.text.replace(/^#{1,4}\s+/gm,"").replace(/\*\*(.+?)\*\*/g,"$1")}
+$("#aiCopy").addEventListener("click",()=>{ if(AI.text) copyText(aiRefText()+" ("+VERS[AI.ctx.ver].name+")\n\n"+aiPlain()); });
+$("#aiSave").addEventListener("click",()=>{
+  if(!AI.text) return; const x=AI.ctx, s=x.verses[0], e=x.verses[x.verses.length-1];
+  const k=x.b+"."+x.c+"."+s+(e!==s?"-"+e:"");
+  const label={explain:"Paliwanag (AI)",sermon:"Sermon (AI)",mh:"Matthew Henry"}[AI.mode];
+  const add="["+label+"]\n"+aiPlain();
+  NOTES[k]={t:NOTES[k]?.t? NOTES[k].t+"\n\n"+add : add, ts:Date.now(), ver:x.ver};
+  store.set("notes",NOTES); if(current==="basahin") renderChapter(); toast("Na-save sa notes");
+});
+
+/* ---------- search ---------- */
+let scope=S.scope;
+$("#scopeSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;scope=S.scope=b.dataset.scope;saveSettings();syncSeg("#scopeSeg","scope",scope);if($("#q").value.trim())runSearch()});
+function syncSeg(sel,attr,val){document.querySelectorAll(sel+" button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset[attr]===val)))}
+$("#searchForm").addEventListener("submit",e=>{e.preventDefault();runSearch()});
+async function runSearch(){
+  const q=$("#q").value.trim(); const out=$("#results"), info=$("#searchInfo");
+  $("#searchVer").textContent = "sa "+VERS[S.ver].name;
+  if(!q){out.innerHTML="";return}
+  let data; try{data=await load(S.ver)}catch(e){info.textContent="Hindi makuha ang Bibliya. Paki-check ang internet.";return}
+  let html="";
+  const ref=parseRef(q);
+  if(ref && data[ref.b] && data[ref.b][ref.c-1] && (!ref.v || ref.v<=data[ref.b][ref.c-1].length)){
+    const w=Math.min(ref.w||ref.v,data[ref.b][ref.c-1].length);
+    const t= ref.v? verseText(data,ref.b,ref.c,ref.v,w) : data[ref.b][ref.c-1].slice(0,2).join(" ")+" …";
+    html += `<button class="res" data-go="${ref.b}.${ref.c}.${ref.v}"><div class="ref">Pumunta sa ${esc(refStr(ref.b,ref.c,ref.v,w))} ›</div><div class="t">${esc(t)}</div></button>`;
+  }
+  const words=fold(q).replace(/-/g,"").split(/\s+/).filter(w=>w.length>1);
+  const pat=w=>w.split("").map(ch=>ch.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("-?");
+  const wres=words.map(w=>new RegExp(pat(w)));
+  let count=0; const MAX=300; const hits=[];
+  if(words.length){
+    const [from,to]= scope==="ot"?[0,39]: scope==="nt"?[39,66]:[0,66];
+    for(let b=from;b<to;b++) for(let c=0;c<data[b].length;c++) for(let v=0;v<data[b][c].length;v++){
+      const t=data[b][c][v]; if(!t) continue; const f=fold(t);
+      if(wres.every(r=>r.test(f))){count++; if(hits.length<MAX) hits.push([b,c+1,v+1,t])}
+    }
+  }
+  const re=new RegExp("("+words.map(pat).join("|")+")","gi");
+  const mark=t=>{ // diacritic-insensitive highlighting via folded index map
+    if(!words.length) return esc(t);
+    const f=fold(t); let res="",last=0; const ranges=[]; let m; re.lastIndex=0;
+    while((m=re.exec(f))){ranges.push([m.index,m.index+m[0].length]); if(!m[0].length) re.lastIndex++}
+    // fold() may change length for decomposed chars; NFD of precomposed latin keeps base positions when marks removed, approximate by same indices
+    ranges.forEach(([s,e])=>{res+=esc(t.slice(last,s))+"<mark>"+esc(t.slice(s,e))+"</mark>";last=e}); return res+esc(t.slice(last));
+  };
+  html += hits.map(([b,c,v,t])=>`<button class="res" data-go="${b}.${c}.${v}"><div class="ref">${esc(refStr(b,c,v))}</div><div class="t">${mark(t)}</div></button>`).join("");
+  info.textContent = words.length ? (count? `${count.toLocaleString()} talata ang may "${q}"`+(count>MAX?` (ipinapakita ang unang ${MAX})`:"") : (ref?"":`Walang nakitang talata na may "${q}". Subukan ang ibang salita o ibang bersiyon.`)) : "";
+  out.innerHTML=html;
+}
+document.addEventListener("click",e=>{const r=e.target.closest("[data-go]"); if(!r) return; const [b,c,v]=r.dataset.go.split(".").map(Number); openAt(b,c,v)});
+
+/* ---------- saved ---------- */
+$("#savedSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.savedTab=b.dataset.k;saveSettings();renderSaved()});
+const HLNAME={y:"Dilaw",g:"Berde",b:"Asul",p:"Rosas"};
+function resultHtml(k,data,extra=""){
+  const [b,c,rest]=k.split("."); const [s,e]=rest.split("-").map(Number);
+  const t= data? verseText(data,+b,+c,s,e||s) : "";
+  const n=NOTES[k];
+  return `<button class="res" data-go="${b}.${c}.${s}"><div class="ref">${extra}${esc(refStr(+b,+c,s,e||s))}</div><div class="t">${esc(t)}</div>${n&&S.savedTab==="notes"?`<div class="note">${esc(n.t)}</div>`:""}</button>`;
+}
+async function renderSaved(){
+  syncSeg("#savedSeg","k",S.savedTab);
+  const list=$("#savedList");
+  let data; try{data=await load(S.ver)}catch(e){data=null}
+  let keys=[];
+  if(S.savedTab==="bm") keys=Object.entries(BM).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+  if(S.savedTab==="notes") keys=Object.entries(NOTES).sort((a,b)=>b[1].ts-a[1].ts).map(x=>x[0]);
+  if(S.savedTab==="hl") keys=Object.keys(HL).sort((a,b)=>{const A=a.split(".").map(Number),B=b.split(".").map(Number);return A[0]-B[0]||A[1]-B[1]||A[2]-B[2]});
+  const empty={bm:"Wala ka pang bookmark. Sa Basahin, pindutin ang isang talata at piliin ang Bookmark.",hl:"Wala ka pang highlight. Pindutin ang talata habang nagbabasa at pumili ng kulay.",notes:"Wala ka pang notes. Pindutin ang talata habang nagbabasa at piliin ang Note."}[S.savedTab];
+  list.innerHTML = keys.length ? keys.map(k=>resultHtml(k,data,S.savedTab==="hl"?`<span class="swatch" style="background:var(--hl-${HL[k]})" aria-label="${HLNAME[HL[k]]}"></span>`:"")).join("") : `<p class="muted">${empty}</p>`;
+}
+
+/* ---------- settings ---------- */
+function applySettings(){
+  document.documentElement.style.setProperty("--read-size",S.font+"px");
+  if(S.theme==="auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme",S.theme);
+  $("#fontRange").value=S.font; syncSeg("#themeSeg","t",S.theme); syncSeg("#scopeSeg","scope",S.scope);
+}
+$("#fontRange").addEventListener("input",e=>{S.font=+e.target.value;saveSettings();applySettings()});
+$("#themeSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.theme=b.dataset.t;saveSettings();applySettings()});
+$("#clearBtn").addEventListener("click",()=>dialog("Burahin ang lahat ng na-save?",`<p>Mabubura ang ${Object.keys(BM).length} bookmark, ${Object.keys(HL).length} highlight at ${Object.keys(NOTES).length} note sa phone na ito. Hindi na ito maibabalik.</p>`,[["Huwag",null],["Burahin lahat",()=>{HL={};BM={};NOTES={};store.set("hl",HL);store.set("bm",BM);store.set("notes",NOTES);toast("Nabura na")},"danger-btn"]]));
+
+/* ---------- start ---------- */
+fillVersionSelects(); applySettings();
+show(location.hash.slice(1)||"ngayon");
+if("serviceWorker" in navigator && window.isSecureContext){navigator.serviceWorker.register("sw.js").catch(()=>{})}
+load(S.ver).catch(()=>{});
+</script>
+</body>
+</html>
