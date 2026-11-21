@@ -50,3 +50,12 @@ MATTHEW HENRY OFFLINE (opsyonal)
 - Kapag may internet ang PC, kusa nitong kinukuha at sine-save ang komentaryo.
 - Para gumana kahit walang internet: i-double-click ang  download-commentary.cmd  (isang beses,
   ilang minuto). Pwedeng ulitin; nilalaktawan ang na-download na.
+
+READING PLAN - idinagdag 2026-11-21
+- Sa Ngayon, pindutin ang "Pumili ng plan". May apat: Buong Bibliya sa 1 taon,
+  Bagong Tipan sa 90 araw, Mga Awit at Kawikaan (31 araw), Mga Ebanghelyo (30 araw).
+- "Basahin" = bubukas ang babasahin sa araw na iyon. Sa dulo ng bawat kabanata may
+  "Susunod" na button, at sa huli ay "Tapusin ang Araw".
+- Walang petsang hinahabol: kapag may na-miss na araw, doon lang magpapatuloy.
+- "Lahat ng araw" = listahan; pwedeng i-tsek o alisin ang tsek, o buksan ang kahit anong araw.
+- Naka-save lang sa phone na ito (gaya ng bookmarks at notes).
