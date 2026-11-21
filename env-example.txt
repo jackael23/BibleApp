@@ -11,3 +11,11 @@ GEMINI_API_KEY=ilagay-dito-ang-key-mo
 # PUBLIC_URL=https://iyong-app.onrender.com/   (sa PC sa simbahan lang: https link ng naka-host na app.
 #   Ipinapakita sa phones na naka-Wi-Fi para doon i-install ang app at magamit offline. May QR din sa itim na window.)
 # SHOW_QR=0   (para hindi ipakita ang QR code sa itim na window)
+# --- Subscription para sa AI (2026-11-21). Kapag walang SUB_SECRET: naka-off, libre ang AI. ---
+# SUB_SECRET=mahabang-lihim-na-salita-16-letra-pataas   (PAREHO dapat sa Render at sa PC; huwag ibahagi)
+# ADMIN_PASSWORD=password-ng-admin-8-letra-pataas      (para sa /admin.html, kung saan ginagawa ang code)
+# SUB_INFO=P99/buwan o P999/taon. Magbayad sa GCash 09xx (Treasurer), tapos ipakita ang resibo sa admin.
+# FREE_AI_PER_DAY=3        (libreng tanong bawat phone bawat araw; 0 = laging kailangan ng code)
+# FREE_AI_PER_IP=30        (libreng tanong bawat Wi-Fi/IP bawat araw)
+# SUB_DAILY_PER_CODE=50    (tanong bawat code bawat araw)
+# SUB_REVOKED=a1b2c3d4,... (ID ng mga code na ihihinto; makikita ang ID sa admin page)

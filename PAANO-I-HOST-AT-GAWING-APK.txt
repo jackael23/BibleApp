@@ -34,6 +34,9 @@ HAKBANG 2 - I-host sa Render (libre)
    - (opsyonal) GEMINI_MODEL = gemini-flash-latest
    - (opsyonal) GEMINI_FALLBACK_MODELS = gemini-flash-lite-latest   <- default na ito; ginagamit
      kapag abala (503) o natagalan ang pangunahing model
+   - (opsyonal, 2026-11-21) Subscription para sa AI: SUB_SECRET, ADMIN_PASSWORD, SUB_INFO
+     (tingnan ang env-example.txt). Ang SUB_SECRET ay dapat PAREHO sa .env ng PC para gumana
+     ang code sa dalawa. Admin page: https://<iyong-app>.onrender.com/admin.html
 5. Create Web Service. Hintayin ang "Live". Makikita ang URL, hal.
    https://bibliya-ng-iglesia.onrender.com
 6. I-test sa phone browser: basahin, search, at "Ipaliwanag".
