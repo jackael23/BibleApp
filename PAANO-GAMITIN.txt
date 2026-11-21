@@ -41,6 +41,8 @@ PALIWANAG AT SERMON (AI) - idinagdag 2026-11-19
 - (2026-11-21) Hindi nagustuhan ang sagot? Pindutin ang "Bagong paliwanag" (o "Bagong sermon")
   at pumili: Iba lang, Mas simple, Mas maikli, o Mas malalim. Bawat isa ay bilang sa limit ng AI.
   Para sa iyo lang ang bagong bersyon; i-save sa notes kung gusto mong itago.
+- "Kopyahin" at "I-save sa notes" ay laging nasa ibaba ng sagot. Kapag na-save na, "Naka-save ✓"
+  ang makikita (hindi nadodoble) at may "Buksan ang notes". May petsa ang bawat naka-save na sagot.
 
 PAANO I-SETUP ANG AI (isang beses lang, sa PC)
 1. Kumuha ng libreng Gemini API key: https://aistudio.google.com/apikey

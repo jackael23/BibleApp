@@ -321,6 +321,13 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
 .aiagain[hidden]{display:none}
 .aiagainbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .aiver{font-size:13px;color:var(--muted);font-style:italic;margin:0 0 10px}
+/* 2026-11-21 — Kopyahin / I-save laging kita sa ibaba ng mahabang sagot; impormasyon kung saan na-save */
+.aiacts{position:sticky;bottom:calc(-16px - env(safe-area-inset-bottom));background:var(--paper);padding:10px 0 calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);z-index:1}
+.aiacts[hidden]{display:none}
+.aisaved{flex-basis:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted)}
+.aisaved[hidden]{display:none}
+.aisaved b{color:var(--ink);font-weight:600}
+#aiSave[aria-disabled="true"]{opacity:.75}
 </style>
 </head>
 <body>
@@ -562,6 +569,7 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
     <button class="btn small ghost" id="aiAgain" hidden>Bagong paliwanag</button>
     <button class="btn small ghost" id="aiCopy">Kopyahin</button>
     <button class="btn small" id="aiSave">I-save sa notes</button>
+    <div class="aisaved" id="aiSaved" hidden><span>Nasa <b>Naka-save › Notes</b> · <span id="aiSavedRef"></span></span><button class="btn small ghost" id="aiOpenNotes">Buksan ang notes</button></div>
   </div>
   <div class="aiagain" id="aiAgainRow" hidden>
     <div class="label">Paano babaguhin?</div>
@@ -914,15 +922,15 @@ async function runAi(opt){
   const memKey=[AI.mode,AI.mode==="mh"?"":AI.lang,x.ver,x.b,x.c,x.verses.join(",")].join("|");
   // 2026-11-21: "again" = new version of the answer (the previous one is sent so it really differs)
   const again=opt&&opt.again&&AI.mode!=="mh"&&AGAIN_NAME[opt.again]?opt.again:"", prev=again?(AI.mem[memKey]||null):null;
-  AI.lastAgain=again; AI.text=""; $("#aiActs").hidden=true; $("#aiRetry").hidden=true; $("#aiAgain").hidden=true; $("#aiAgainRow").hidden=true;
+  AI.lastAgain=again; AI.text=""; AI.tag=""; syncAiSaved(); $("#aiActs").hidden=true; $("#aiRetry").hidden=true; $("#aiAgain").hidden=true; $("#aiAgainRow").hidden=true;
   const data=DATA[x.ver];
   const quote = data? `<div class="vq">${esc(x.verses.map(v=>(x.verses.length>1?v+" ":"")+(data[x.b][x.c-1][v-1]||"")).join(" "))}<div class="src">${esc(aiRefText())} (${VERS[x.ver].name})</div></div>` : "";
-  const show=(html,text)=>{ if(seq!==AI.seq) return; body.innerHTML=quote+html; AI.text=text||""; $("#aiActs").hidden=!text; $("#aiSave").hidden=$("#aiCopy").hidden=!text;
+  const show=(html,text,tag)=>{ if(seq!==AI.seq) return; body.innerHTML=quote+html; AI.text=text||""; AI.tag=tag||""; syncAiSaved(); $("#aiActs").hidden=!text; $("#aiSave").hidden=$("#aiCopy").hidden=!text;
     $("#aiAgain").hidden=!text||AI.mode==="mh"; $("#aiAgain").textContent=AI.mode==="sermon"?"Bagong sermon":"Bagong paliwanag"; };
   const fail=(msg,offerMh)=>{ if(seq!==AI.seq) return; body.innerHTML=quote+`<p>${esc(msg)}</p>`+(offerMh?`<p><button class="btn small" id="aiToMh">Basahin ang Matthew Henry</button></p>`:"");
     $("#aiActs").hidden=false; $("#aiRetry").hidden=false; $("#aiCopy").hidden=$("#aiSave").hidden=true;
     const b=$("#aiToMh"); if(b) b.onclick=()=>{AI.mode="mh";runAi()}; };
-  if(!again&&AI.mem[memKey]){ const m=AI.mem[memKey]; show(m.html,m.text); return; }
+  if(!again&&AI.mem[memKey]){ const m=AI.mem[memKey]; show(m.html,m.text,m.tag); return; }
   body.innerHTML=quote+`<p class="muted"><span class="spin"></span>${AI.mode==="mh"?"Kinukuha ang komentaryo…":"Pinag-iisipan… (mga 10 hanggang 40 segundo)"}</p>`;
   try{
     if(AI.mode==="mh"){
@@ -941,13 +949,14 @@ async function runAi(opt){
     const j=await r.json().catch(()=>({error:"Walang sagot ang server."}));
     if(!r.ok){
       // A failed "new version" keeps the earlier answer on screen.
-      if(again&&prev&&seq===AI.seq){show(prev.html,prev.text);toast(j.error||"May error ang AI.");return}
+      if(again&&prev&&seq===AI.seq){show(prev.html,prev.text,prev.tag);toast(j.error||"May error ang AI.");return}
       return fail(j.error||"May error ang AI.",true);
     }
     const html=(again?`<p class="aiver">Bagong bersyon · ${esc(AGAIN_NAME[again])}</p>`:"")+mdToHtml(j.text);
-    AI.mem[memKey]={html,text:j.text}; show(html,j.text);
+    const tag=again?AGAIN_NAME[again]:"";
+    AI.mem[memKey]={html,text:j.text,tag}; show(html,j.text,tag);
   }catch(e){
-    if(again&&prev&&seq===AI.seq){show(prev.html,prev.text);toast(navigator.onLine===false?"Walang koneksyon. Subukan ulit.":"Hindi nakuha ang bagong bersyon. Subukan ulit.");return}
+    if(again&&prev&&seq===AI.seq){show(prev.html,prev.text,prev.tag);toast(navigator.onLine===false?"Walang koneksyon. Subukan ulit.":"Hindi nakuha ang bagong bersyon. Subukan ulit.");return}
     fail(navigator.onLine===false?"Walang koneksyon. Paki-check ang internet o Wi-Fi, tapos subukan ulit.":(e&&e.name==="TimeoutError")?"Natagalan ang sagot. Subukan ulit mamaya, o gamitin muna ang Matthew Henry.":"Hindi maabot ang server ng app. Paki-check ang internet, tapos subukan ulit. (Kung sa PC naka-host: siguraduhing bukas ang start-bible.cmd.)",AI.mode!=="mh"); }
 }
 $("#actExplain").addEventListener("click",()=>openAi("explain"));
@@ -960,14 +969,26 @@ $("#aiAgainCancel").addEventListener("click",()=>{$("#aiAgainRow").hidden=true})
 $("#aiAgainRow").addEventListener("click",e=>{const b=e.target.closest("[data-again]");if(b)runAi({again:b.dataset.again})});
 function aiPlain(){return AI.text.replace(/^#{1,4}\s+/gm,"").replace(/\*\*(.+?)\*\*/g,"$1")}
 $("#aiCopy").addEventListener("click",()=>{ if(AI.text) copyText(aiRefText()+" ("+VERS[AI.ctx.ver].name+")\n\n"+aiPlain()); });
+// 2026-11-21: no duplicate when saved twice, date + version in the label, show where it went.
+function aiNoteKey(){const x=AI.ctx, s=x.verses[0], e=x.verses[x.verses.length-1]; return x.b+"."+x.c+"."+s+(e!==s?"-"+e:"")}
+function aiIsSaved(){ if(!AI.text||!AI.ctx) return false; const n=NOTES[aiNoteKey()]; return !!(n&&n.t&&n.t.includes(aiPlain())); }
+function syncAiSaved(){
+  const saved=aiIsSaved(), btn=$("#aiSave");
+  btn.textContent=saved?"Naka-save ✓":"I-save sa notes"; btn.setAttribute("aria-disabled",String(saved));
+  btn.className="btn small"+(saved?" ghost":"");
+  $("#aiSaved").hidden=!saved; if(saved&&AI.ctx) $("#aiSavedRef").textContent=aiRefText();
+}
 $("#aiSave").addEventListener("click",()=>{
-  if(!AI.text) return; const x=AI.ctx, s=x.verses[0], e=x.verses[x.verses.length-1];
-  const k=x.b+"."+x.c+"."+s+(e!==s?"-"+e:"");
+  if(!AI.text) return;
+  if(aiIsSaved()){toast("Naka-save na ito sa notes");return}
+  const x=AI.ctx, k=aiNoteKey(), d=new Date();
   const label={explain:"Paliwanag (AI)",sermon:"Sermon (AI)",mh:"Matthew Henry"}[AI.mode];
-  const add="["+label+"]\n"+aiPlain();
+  const head="["+[label,AI.tag,d.getDate()+" "+MONTHS[d.getMonth()].slice(0,3)+" "+d.getFullYear()].filter(Boolean).join(" · ")+"]";
+  const add=head+"\n"+aiPlain();
   NOTES[k]={t:NOTES[k]?.t? NOTES[k].t+"\n\n"+add : add, ts:Date.now(), ver:x.ver};
-  store.set("notes",NOTES); if(current==="basahin") renderChapter(); toast("Na-save sa notes");
+  store.set("notes",NOTES); if(current==="basahin") renderChapter(); syncAiSaved(); toast("Na-save sa notes");
 });
+$("#aiOpenNotes").addEventListener("click",()=>{S.savedTab="notes";saveSettings();closeSheets();go("naka-save")});
 
 /* ---------- search ---------- */
 let scope=S.scope;
