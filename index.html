@@ -308,6 +308,14 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
 #installCard .tipnote{font-size:13px;color:var(--muted)}
 #installCard p{margin:0}
 #installCard a.btn{text-decoration:none;color:var(--accent-ink);display:inline-block}
+/* 2026-11-21 — Paalala araw-araw */
+.remBtns{display:grid;gap:8px}
+.remBtns .btn{display:block;text-align:center;text-decoration:none;width:100%}
+.remBtns a.btn{color:var(--accent-ink)}
+.remBtns .muted2{font-weight:400;opacity:.8;font-size:13px}
+.remNote{margin-top:14px;font-size:14px;color:var(--muted);display:grid;gap:6px}
+.remNote p{margin:0}
+.remNote b{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -457,6 +465,24 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
 <div class="sheet" id="planSheet" role="dialog" aria-labelledby="planTitle">
   <div class="sheethead"><h3 id="planTitle" style="margin:0">Reading plan</h3><button class="btn small ghost" data-close>Isara</button></div>
   <div id="planBody"></div>
+</div>
+
+<!-- Paalala araw-araw (2026-11-21) -->
+<div class="sheet" id="remSheet" role="dialog" aria-labelledby="remTitle">
+  <div class="sheethead"><h3 id="remTitle" style="margin:0">Paalala araw-araw</h3><button class="btn small ghost" data-close>Isara</button></div>
+  <p style="font-size:15px;margin:0 0 12px">Ilalagay ang paalala sa <b>calendar ng phone</b> mo, kaya darating ito kahit nakasara ang app at kahit walang internet. Pagpindot sa link, bubukas ang babasahin mo ngayon.</p>
+  <label class="label" for="remTime">Oras ng paalala</label>
+  <input type="time" id="remTime" value="06:00" style="display:block;margin:6px 0 14px;font-size:20px;padding:8px 10px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--ink)">
+  <div class="remBtns">
+    <a class="btn" id="remGoogle" target="_blank" rel="noopener">Google Calendar <span class="muted2">(Android)</span></a>
+    <button class="btn ghost" id="remIcs">I-download (.ics) <span class="muted2">(iPhone at iba pa)</span></button>
+  </div>
+  <div class="remNote">
+    <p><b>Google Calendar:</b> pindutin ang <b>Save</b>. Ang notification ay ayon sa setting ng calendar mo (hal. 10 minuto bago); pwedeng palitan sa event.</p>
+    <p><b>iPhone:</b> buksan ang file, tapos <b>Add All</b> o <b>Idagdag</b>.</p>
+    <p><b>Itigil ang paalala:</b> buksan ang event sa calendar at burahin ang lahat ng susunod.</p>
+    <p><b>Mas gusto ang alarm?</b> Sa Clock app ng phone, gumawa ng alarm araw-araw at pangalanan itong "Basa ng Bibliya".</p>
+  </div>
 </div>
 
 <!-- Talata bilang larawan (2026-11-21) -->
@@ -1063,16 +1089,17 @@ function openPlanDay(d){
 function renderPlanCard(){
   const card=$("#planCard"); if(!card) return;
   if(!PLAN){
-    card.innerHTML=`<div class="label">Reading plan</div><h2>Magbasa araw-araw</h2><p class="muted" style="font-size:15px">Pumili ng plan at may nakahandang babasahin ka bawat araw.</p><div class="row"><button class="btn small" data-plan="choose">Pumili ng plan</button></div>`;
+    card.innerHTML=`<div class="label">Reading plan</div><h2>Magbasa araw-araw</h2><p class="muted" style="font-size:15px">Pumili ng plan at may nakahandang babasahin ka bawat araw.</p><div class="row"><button class="btn small ghost" data-plan="remind">Paalala</button><button class="btn small" data-plan="choose">Pumili ng plan</button></div>`;
   }else{
     const d=nextDay(), name=esc(PLANS[PLAN.id].name);
-    if(d<0) card.innerHTML=`<div class="label">${name}</div><h2>Natapos mo ang plan!</h2>${progressHtml()}<div class="row"><button class="btn small ghost" data-plan="list">Lahat ng araw</button><button class="btn small" data-plan="new">Pumili ng bago</button></div>`;
-    else card.innerHTML=`<div class="label">Babasahin ngayon · ${name}</div><h2>Araw ${d+1} · ${esc(dayLabel(planDays(PLAN.id)[d]))}</h2>${progressHtml()}<div class="row"><button class="btn small ghost" data-plan="list">Lahat ng araw</button><button class="btn small" data-plan="read">Basahin</button></div>`;
+    if(d<0) card.innerHTML=`<div class="label">${name}</div><h2>Natapos mo ang plan!</h2>${progressHtml()}<div class="row"><button class="btn small ghost" data-plan="remind">Paalala</button><button class="btn small ghost" data-plan="list">Lahat ng araw</button><button class="btn small" data-plan="new">Pumili ng bago</button></div>`;
+    else card.innerHTML=`<div class="label">Babasahin ngayon · ${name}</div><h2>Araw ${d+1} · ${esc(dayLabel(planDays(PLAN.id)[d]))}</h2>${progressHtml()}<div class="row"><button class="btn small ghost" data-plan="remind">Paalala</button><button class="btn small ghost" data-plan="list">Lahat ng araw</button><button class="btn small" data-plan="read">Basahin</button></div>`;
   }
 }
 $("#planCard").addEventListener("click",e=>{
   const a=e.target.closest("[data-plan]")?.dataset.plan; if(!a) return;
   if(a==="read") openPlanDay(nextDay());
+  else if(a==="remind") openReminder();
   else if(a==="new") stopPlan();
   else openPlanSheet();
 });
@@ -1307,6 +1334,70 @@ if(LAN_HTTP && !store.get("lanTipOff",false)){
     showInstallTip(url);
   });
 }
+
+/* ---------- paalala araw-araw (2026-11-21) ---------- */
+// A repeating event in the phone's own calendar: it reminds even when the app is closed or offline.
+// No server and no push: the free hosting sleeps and cannot keep subscriptions.
+let remBase=null;
+function remAppUrl(){
+  // Link back to the app (the "Ngayon" page shows today's reading). On the church Wi-Fi (http) use the hosted https link if set.
+  const here=location.origin+location.pathname.replace(/index\.html$/,"");
+  return (LAN_HTTP&&remBase?remBase:here)+"#ngayon";
+}
+function remTimeVal(){const v=$("#remTime").value;return /^([01]\d|2[0-3]):[0-5]\d$/.test(v)?v:"06:00"}
+function remStart(){
+  // Next time this clock time comes (today if still ahead, else tomorrow), in local time.
+  const [h,m]=remTimeVal().split(":").map(Number), d=new Date(); d.setSeconds(0,0);
+  const t=new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,m); if(t<=d) t.setDate(t.getDate()+1);
+  return t;
+}
+const remStamp=(d)=>d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")+"T"+String(d.getHours()).padStart(2,"0")+String(d.getMinutes()).padStart(2,"0")+"00";
+function remTitle(){return "Basa ng Bibliya"}
+function remDetails(url){return "Oras na para magbasa ng Bibliya"+(PLAN?" ("+PLANS[PLAN.id].name+")":"")+". Buksan: "+url}
+function remGoogleUrl(){
+  const st=remStart(), en=new Date(st.getTime()+15*60000), url=remAppUrl();
+  let tz=""; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||""}catch(e){}
+  const q=new URLSearchParams({action:"TEMPLATE",text:remTitle(),details:remDetails(url),dates:remStamp(st)+"/"+remStamp(en),recur:"RRULE:FREQ=DAILY"});
+  if(tz) q.set("ctz",tz);
+  return "https://calendar.google.com/calendar/render?"+q.toString();
+}
+function icsText(v){return String(v).replace(/\\/g,"\\\\").replace(/;/g,"\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n")}
+function icsFold(line){ // lines longer than 75 bytes continue on the next line with a leading space (RFC 5545)
+  const out=[]; let cur="", n=0;
+  for(const ch of line){const b=new TextEncoder().encode(ch).length; if(n+b>(out.length?74:75)){out.push(cur);cur="";n=0} cur+=ch;n+=b}
+  out.push(cur); return out.join("\r\n ");
+}
+function remIcs(){
+  const st=remStart(), url=remAppUrl(), now=new Date();
+  const utc=now.toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
+  const uid=(crypto.randomUUID?crypto.randomUUID():String(now.getTime())+Math.random().toString(36).slice(2))+"@bibliya";
+  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Bibliya ng Iglesia//Paalala//TL","CALSCALE:GREGORIAN","METHOD:PUBLISH",
+    "BEGIN:VEVENT","UID:"+uid,"DTSTAMP:"+utc,"DTSTART:"+remStamp(st),"DURATION:PT15M","RRULE:FREQ=DAILY",
+    "SUMMARY:"+icsText(remTitle()),"DESCRIPTION:"+icsText(remDetails(url)),"URL:"+url,
+    "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsText(remTitle()),"TRIGGER:PT0M","END:VALARM",
+    "END:VEVENT","END:VCALENDAR"].map(icsFold).join("\r\n")+"\r\n";
+}
+function remRefresh(){S.remTime=remTimeVal();saveSettings();$("#remGoogle").href=remGoogleUrl()}
+function openReminder(){
+  $("#remTime").value=/^([01]\d|2[0-3]):[0-5]\d$/.test(S.remTime||"")?S.remTime:"06:00";
+  remRefresh(); openSheet("#remSheet");
+  if(LAN_HTTP&&remBase===null){
+    remBase="";
+    fetch("api/status",{cache:"no-store"}).then(r=>r.ok?r.json():{}).catch(()=>({})).then(j=>{
+      try{const u=new URL(j&&j.publicUrl);if(u.protocol==="https:"&&u.href.length<=200)remBase=u.href.replace(/#.*$/,"")}catch(e){}
+      remRefresh();
+    });
+  }
+}
+$("#remTime").addEventListener("change",remRefresh);
+$("#remTime").addEventListener("input",remRefresh);
+$("#remIcs").addEventListener("click",()=>{
+  const blob=new Blob([remIcs()],{type:"text/calendar;charset=utf-8"}), url=URL.createObjectURL(blob);
+  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  if(ios){location.href=url} // Safari offers "Add to Calendar" for text/calendar
+  else{const a=document.createElement("a");a.href=url;a.download="paalala-bibliya.ics";document.body.appendChild(a);a.click();a.remove()}
+  setTimeout(()=>URL.revokeObjectURL(url),60000); toast("Buksan ang file para idagdag sa calendar");
+});
 
 /* ---------- settings ---------- */
 function applySettings(){
