@@ -283,6 +283,15 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
 #planBar[hidden]{display:none}
 #planBar .row{justify-content:flex-end}
 </style>
+<style id="verse-image">
+/* 2026-11-21 — Talata bilang larawan (image card) */
+.actions{grid-template-columns:repeat(4,1fr)}
+.imgprev{display:flex;justify-content:center;background:var(--accent-soft);border-radius:4px;padding:10px;margin:4px 0 12px}
+.imgprev canvas{display:block;max-width:100%;max-height:46vh;width:auto;height:auto;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.imgopts{display:grid;gap:8px;margin-bottom:12px}
+.imgopts .seg{width:100%}
+.imgopts .seg button{flex:1}
+</style>
 </head>
 <body>
 <div class="app">
@@ -305,6 +314,7 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
             <span class="ref" id="votdRef"></span>
             <div class="row">
               <button class="btn small ghost" id="votdCopy">Kopyahin</button>
+              <button class="btn small ghost" id="votdImg">Larawan</button>
               <button class="btn small" id="votdRead">Basahin ang kabanata</button>
             </div>
           </div>
@@ -430,6 +440,27 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
   <div id="planBody"></div>
 </div>
 
+<!-- Talata bilang larawan (2026-11-21) -->
+<div class="sheet" id="imgSheet" role="dialog" aria-labelledby="imgTitle">
+  <div class="sheethead"><h3 id="imgTitle" style="margin:0">Gawing larawan</h3><button class="btn small ghost" data-close>Isara</button></div>
+  <div class="imgprev"><canvas id="imgCanvas" width="1080" height="1080" role="img" aria-label="Preview ng larawan"></canvas></div>
+  <div class="imgopts">
+    <div class="seg" role="group" aria-label="Laki" id="imgSizeSeg">
+      <button type="button" data-size="square" aria-pressed="true">Square (post)</button>
+      <button type="button" data-size="story" aria-pressed="false">Story</button>
+    </div>
+    <div class="seg" role="group" aria-label="Itsura" id="imgThemeSeg">
+      <button type="button" data-th="paper" aria-pressed="true">Papel</button>
+      <button type="button" data-th="leather" aria-pressed="false">Leather</button>
+      <button type="button" data-th="simple" aria-pressed="false">Simple</button>
+    </div>
+  </div>
+  <div class="row" style="justify-content:flex-end">
+    <button class="btn small ghost" id="imgSave">I-save</button>
+    <button class="btn small" id="imgShare" hidden>Ibahagi</button>
+  </div>
+</div>
+
 <!-- Verse actions -->
 <div class="sheet" id="actSheet" role="dialog" aria-label="Gawin sa talata">
   <div class="sheethead"><h3 id="actTitle">Juan 3:16</h3><button class="btn small ghost" id="actDone">Tapos</button></div>
@@ -445,6 +476,7 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
     <button id="actBm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg><span>Bookmark</span></button>
     <button id="actNote"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg><span>Note</span></button>
     <button id="actCopy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg><span>Kopyahin</span></button>
+    <button id="actImg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg><span>Larawan</span></button>
   </div>
   <div class="aibtns">
     <button id="actExplain"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg>Ipaliwanag</button>
@@ -1054,6 +1086,105 @@ function stopPlan(){
   if(!n) return reset();
   dialog("Itigil ang plan na ito?",`<p>Mabubura ang tsek ng ${n} araw na natapos mo sa <b>${esc(PLANS[PLAN.id].name)}</b>. Pagkatapos, pwede kang pumili ng bagong plan.</p>`,[["Huwag",null],["Itigil",reset,"danger-btn"]]);
 }
+
+/* ---------- talata bilang larawan / image card (2026-11-21) ---------- */
+// Drawn on a canvas in the phone itself: works offline, nothing is sent to the server.
+const IMG_SIZES={square:[1080,1080],story:[1080,1920]};
+const IMG_THEMES={
+  paper:{bg:["#f6f1e7","#ebe3d3"],ink:"#26211c",ref:"#9a2a1f",foot:"#786d60",rule:"#c09a52",frame:true},
+  leather:{bg:["#4a2f22","#2a1a13"],ink:"#f3e6c8",ref:"#cfae69",foot:"#b89a6a",rule:"#c09a52",frame:true},
+  simple:{bg:["#ffffff","#ffffff"],ink:"#141414",ref:"#141414",foot:"#8a8a8a",rule:"#d0d0d0",frame:false}
+};
+const IMG_MAX_CHARS=700;
+const IMG={ctx:null,blob:null,seq:0};
+if(!IMG_SIZES[S.imgSize]) S.imgSize="square";
+if(!IMG_THEMES[S.imgTheme]) S.imgTheme="paper";
+function wrapLines(g,text,maxW){
+  const words=text.split(/\s+/).filter(Boolean), lines=[]; let line="";
+  for(const w of words){const t=line?line+" "+w:w; if(line&&g.measureText(t).width>maxW){lines.push(line);line=w}else line=t}
+  if(line) lines.push(line); return lines;
+}
+function rule(g,cx,y,color){
+  g.strokeStyle=color;g.fillStyle=color;g.lineWidth=2;
+  g.beginPath();g.moveTo(cx-110,y);g.lineTo(cx-18,y);g.moveTo(cx+18,y);g.lineTo(cx+110,y);g.stroke();
+  g.beginPath();g.moveTo(cx,y-8);g.lineTo(cx+8,y);g.lineTo(cx,y+8);g.lineTo(cx-8,y);g.closePath();g.fill();
+}
+function drawVerseImage(cv,ctx,size,theme){
+  const [W,H]=IMG_SIZES[size], T=IMG_THEMES[theme], g=cv.getContext("2d");
+  cv.width=W; cv.height=H;
+  const grad=g.createLinearGradient(0,0,0,H); grad.addColorStop(0,T.bg[0]); grad.addColorStop(1,T.bg[1]);
+  g.fillStyle=grad; g.fillRect(0,0,W,H);
+  if(T.frame){g.strokeStyle=T.rule;g.lineWidth=4;g.strokeRect(40,40,W-80,H-80);g.lineWidth=1.5;g.strokeRect(54,54,W-108,H-108)}
+  const pad=120, maxW=W-pad*2, cx=W/2;
+  const top=size==="story"?260:150, bottom=H-(size==="story"?260:170);
+  const quote="“"+ctx.text+"”";
+  const refFont=size==="story"?40:36;
+  // Biggest font size whose block (rule + quote + ref + rule) fits between top and bottom.
+  let fs=size==="story"?84:66, lines, lh;
+  for(;;fs-=2){
+    g.font=`400 ${fs}px "Gentium Book Plus", Georgia, serif`;
+    lines=wrapLines(g,quote,maxW); lh=Math.round(fs*1.4);
+    if(lines.length*lh+refFont+150<=bottom-top||fs<=26) break;
+  }
+  const block=lines.length*lh+refFont+150;
+  let y=top+Math.max(0,(bottom-top-block)/2);
+  rule(g,cx,y+10,T.rule); y+=60;
+  g.fillStyle=T.ink; g.textAlign="center"; g.textBaseline="top";
+  g.font=`400 ${fs}px "Gentium Book Plus", Georgia, serif`;
+  for(const l of lines){g.fillText(l,cx,y);y+=lh}
+  y+=40;
+  g.fillStyle=T.ref; g.font=`700 ${refFont}px "Gentium Book Plus", Georgia, serif`;
+  g.fillText(ctx.ref,cx,y); y+=refFont+40;
+  rule(g,cx,y+10,T.rule);
+  g.fillStyle=T.foot; g.font=`600 ${size==="story"?28:24}px Figtree, system-ui, sans-serif`;
+  g.fillText("Bibliya ng Iglesia",cx,H-(size==="story"?170:112));
+}
+async function renderImg(){
+  const seq=++IMG.seq; IMG.blob=null;
+  syncSeg("#imgSizeSeg","size",S.imgSize); syncSeg("#imgThemeSeg","th",S.imgTheme);
+  try{await Promise.all(['400 40px "Gentium Book Plus"','700 40px "Gentium Book Plus"','600 24px Figtree'].map(f=>document.fonts.load(f)))}catch(e){}
+  if(seq!==IMG.seq) return;
+  const cv=$("#imgCanvas"); drawVerseImage(cv,IMG.ctx,S.imgSize,S.imgTheme);
+  cv.toBlob(b=>{if(seq===IMG.seq) IMG.blob=b},"image/png");
+}
+function imgFileName(){return "talata-"+fold(IMG.ctx.ref).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")+".png"}
+function canShareFiles(){try{return !!(navigator.canShare&&navigator.canShare({files:[new File([new Blob(["x"],{type:"image/png"})],"t.png",{type:"image/png"})]}))}catch(e){return false}}
+function openImage(text,ref){
+  text=String(text||"").replace(/\s+/g," ").trim();
+  if(!text){toast("Walang laman ang talata");return}
+  if(text.length>IMG_MAX_CHARS){toast("Masyadong mahaba para sa larawan. Pumili ng mas kaunting talata.");return}
+  IMG.ctx={text,ref}; $("#imgShare").hidden=!canShareFiles();
+  openSheet("#imgSheet"); renderImg();
+}
+function getImgBlob(){
+  if(IMG.blob) return Promise.resolve(IMG.blob);
+  return new Promise(res=>$("#imgCanvas").toBlob(b=>res(b),"image/png"));
+}
+$("#imgSizeSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.imgSize=b.dataset.size;saveSettings();renderImg()});
+$("#imgThemeSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.imgTheme=b.dataset.th;saveSettings();renderImg()});
+$("#imgSave").addEventListener("click",async()=>{
+  const blob=await getImgBlob(); if(!blob){toast("Hindi nagawa ang larawan");return}
+  const url=URL.createObjectURL(blob), a=document.createElement("a");
+  a.href=url; a.download=imgFileName(); document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000); toast("Na-save ang larawan");
+});
+$("#imgShare").addEventListener("click",async()=>{
+  const blob=await getImgBlob(); if(!blob){toast("Hindi nagawa ang larawan");return}
+  const file=new File([blob],imgFileName(),{type:"image/png"});
+  try{await navigator.share({files:[file],title:IMG.ctx.ref})}
+  catch(e){if(e&&e.name!=="AbortError")toast("Hindi ma-share. Pindutin ang I-save.")}
+});
+$("#actImg").addEventListener("click",()=>{
+  const data=DATA[S.ver]; if(!data) return;
+  // Skipped verses (e.g. 3:16 and 3:18) are marked with "…" so the card does not read as one passage.
+  const text=selected.map((v,i)=>(i&&v!==selected[i-1]+1?"… ":"")+(data[S.book][S.chap-1][v-1]||"")).join(" ");
+  const ref=selRef()+" · "+VERS[S.ver].name;
+  clearSelection(); openImage(text,ref);
+});
+$("#votdImg").addEventListener("click",()=>{
+  const [b,c,v,w]=votdToday(); const data=DATA[S.ver]; if(!data) return;
+  openImage(verseText(data,b,c,v,w),refStr(b,c,v,w)+" · "+VERS[S.ver].name);
+});
 
 /* ---------- settings ---------- */
 function applySettings(){
