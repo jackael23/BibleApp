@@ -316,6 +316,11 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
 .remNote{margin-top:14px;font-size:14px;color:var(--muted);display:grid;gap:6px}
 .remNote p{margin:0}
 .remNote b{color:var(--ink)}
+/* 2026-11-21 — Bagong paliwanag / sermon */
+.aiagain{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:4px;background:var(--surface);display:grid;gap:8px}
+.aiagain[hidden]{display:none}
+.aiagainbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.aiver{font-size:13px;color:var(--muted);font-style:italic;margin:0 0 10px}
 </style>
 </head>
 <body>
@@ -554,8 +559,19 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
   <div id="aiBody" class="aibody" aria-live="polite"></div>
   <div class="aiacts" id="aiActs" hidden>
     <button class="btn small ghost" id="aiRetry" hidden>Subukan ulit</button>
+    <button class="btn small ghost" id="aiAgain" hidden>Bagong paliwanag</button>
     <button class="btn small ghost" id="aiCopy">Kopyahin</button>
     <button class="btn small" id="aiSave">I-save sa notes</button>
+  </div>
+  <div class="aiagain" id="aiAgainRow" hidden>
+    <div class="label">Paano babaguhin?</div>
+    <div class="aiagainbtns">
+      <button class="btn small ghost" data-again="other">Iba lang</button>
+      <button class="btn small ghost" data-again="simpler">Mas simple</button>
+      <button class="btn small ghost" data-again="shorter">Mas maikli</button>
+      <button class="btn small ghost" data-again="deeper">Mas malalim</button>
+    </div>
+    <div class="row" style="justify-content:flex-end"><button class="btn small ghost" id="aiAgainCancel">Huwag na</button></div>
   </div>
   <div class="ainote" id="aiNote"></div>
 </div>
@@ -891,18 +907,22 @@ function syncAiBar(){
   $("#aiTitle").textContent = {explain:"Paliwanag",sermon:"Sermon",mh:"Matthew Henry"}[AI.mode]+" · "+aiRefText();
   $("#aiNote").innerHTML = AI.mode==="mh" ? "Lumang komentaryo (1706), English lang. Public domain." : "Gawa ng AI (Gemini) kaya pwedeng magkamali. Ikumpara sa Bibliya at itanong sa pastor bago ituro.";
 }
-async function runAi(){
+const AGAIN_NAME={other:"Iba lang",simpler:"Mas simple",shorter:"Mas maikli",deeper:"Mas malalim"};
+async function runAi(opt){
   syncAiBar();
   const x=AI.ctx, seq=++AI.seq, body=$("#aiBody");
   const memKey=[AI.mode,AI.mode==="mh"?"":AI.lang,x.ver,x.b,x.c,x.verses.join(",")].join("|");
-  AI.text=""; $("#aiActs").hidden=true; $("#aiRetry").hidden=true;
+  // 2026-11-21: "again" = new version of the answer (the previous one is sent so it really differs)
+  const again=opt&&opt.again&&AI.mode!=="mh"&&AGAIN_NAME[opt.again]?opt.again:"", prev=again?(AI.mem[memKey]||null):null;
+  AI.lastAgain=again; AI.text=""; $("#aiActs").hidden=true; $("#aiRetry").hidden=true; $("#aiAgain").hidden=true; $("#aiAgainRow").hidden=true;
   const data=DATA[x.ver];
   const quote = data? `<div class="vq">${esc(x.verses.map(v=>(x.verses.length>1?v+" ":"")+(data[x.b][x.c-1][v-1]||"")).join(" "))}<div class="src">${esc(aiRefText())} (${VERS[x.ver].name})</div></div>` : "";
-  const show=(html,text)=>{ if(seq!==AI.seq) return; body.innerHTML=quote+html; AI.text=text||""; $("#aiActs").hidden=!text; $("#aiSave").hidden=$("#aiCopy").hidden=!text; };
+  const show=(html,text)=>{ if(seq!==AI.seq) return; body.innerHTML=quote+html; AI.text=text||""; $("#aiActs").hidden=!text; $("#aiSave").hidden=$("#aiCopy").hidden=!text;
+    $("#aiAgain").hidden=!text||AI.mode==="mh"; $("#aiAgain").textContent=AI.mode==="sermon"?"Bagong sermon":"Bagong paliwanag"; };
   const fail=(msg,offerMh)=>{ if(seq!==AI.seq) return; body.innerHTML=quote+`<p>${esc(msg)}</p>`+(offerMh?`<p><button class="btn small" id="aiToMh">Basahin ang Matthew Henry</button></p>`:"");
     $("#aiActs").hidden=false; $("#aiRetry").hidden=false; $("#aiCopy").hidden=$("#aiSave").hidden=true;
     const b=$("#aiToMh"); if(b) b.onclick=()=>{AI.mode="mh";runAi()}; };
-  if(AI.mem[memKey]){ const m=AI.mem[memKey]; show(m.html,m.text); return; }
+  if(!again&&AI.mem[memKey]){ const m=AI.mem[memKey]; show(m.html,m.text); return; }
   body.innerHTML=quote+`<p class="muted"><span class="spin"></span>${AI.mode==="mh"?"Kinukuha ang komentaryo…":"Pinag-iisipan… (mga 10 hanggang 40 segundo)"}</p>`;
   try{
     if(AI.mode==="mh"){
@@ -915,18 +935,29 @@ async function runAi(){
       const text=parts.map(p=>p.h+"\n"+p.t).join("\n\n")+"\n\n— "+j.source;
       AI.mem[memKey]={html,text}; return show(html,text);
     }
-    const r=await fetch("api/ai",{method:"POST",signal:(AbortSignal.timeout?AbortSignal.timeout(80000):undefined),headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:AI.mode,lang:AI.lang,ver:x.ver,b:x.b,c:x.c,verses:x.verses})});
+    const req={mode:AI.mode,lang:AI.lang,ver:x.ver,b:x.b,c:x.c,verses:x.verses};
+    if(again){req.again=again; if(prev&&prev.text) req.prev=prev.text}
+    const r=await fetch("api/ai",{method:"POST",signal:(AbortSignal.timeout?AbortSignal.timeout(80000):undefined),headers:{"Content-Type":"application/json"},body:JSON.stringify(req)});
     const j=await r.json().catch(()=>({error:"Walang sagot ang server."}));
-    if(!r.ok) return fail(j.error||"May error ang AI.",true);
-    const html=mdToHtml(j.text);
+    if(!r.ok){
+      // A failed "new version" keeps the earlier answer on screen.
+      if(again&&prev&&seq===AI.seq){show(prev.html,prev.text);toast(j.error||"May error ang AI.");return}
+      return fail(j.error||"May error ang AI.",true);
+    }
+    const html=(again?`<p class="aiver">Bagong bersyon · ${esc(AGAIN_NAME[again])}</p>`:"")+mdToHtml(j.text);
     AI.mem[memKey]={html,text:j.text}; show(html,j.text);
-  }catch(e){ fail(navigator.onLine===false?"Walang koneksyon. Paki-check ang internet o Wi-Fi, tapos subukan ulit.":(e&&e.name==="TimeoutError")?"Natagalan ang sagot. Subukan ulit mamaya, o gamitin muna ang Matthew Henry.":"Hindi maabot ang server ng app. Paki-check ang internet, tapos subukan ulit. (Kung sa PC naka-host: siguraduhing bukas ang start-bible.cmd.)",AI.mode!=="mh"); }
+  }catch(e){
+    if(again&&prev&&seq===AI.seq){show(prev.html,prev.text);toast(navigator.onLine===false?"Walang koneksyon. Subukan ulit.":"Hindi nakuha ang bagong bersyon. Subukan ulit.");return}
+    fail(navigator.onLine===false?"Walang koneksyon. Paki-check ang internet o Wi-Fi, tapos subukan ulit.":(e&&e.name==="TimeoutError")?"Natagalan ang sagot. Subukan ulit mamaya, o gamitin muna ang Matthew Henry.":"Hindi maabot ang server ng app. Paki-check ang internet, tapos subukan ulit. (Kung sa PC naka-host: siguraduhing bukas ang start-bible.cmd.)",AI.mode!=="mh"); }
 }
 $("#actExplain").addEventListener("click",()=>openAi("explain"));
 $("#actSermon").addEventListener("click",()=>openAi("sermon"));
 $("#aiModeSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b||b.dataset.m===AI.mode)return;AI.mode=b.dataset.m;runAi()});
 $("#aiLangSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b||b.dataset.l===AI.lang)return;AI.lang=b.dataset.l;runAi()});
-$("#aiRetry").addEventListener("click",runAi);
+$("#aiRetry").addEventListener("click",()=>runAi());
+$("#aiAgain").addEventListener("click",()=>{$("#aiAgainRow").hidden=false;$("#aiAgainRow").scrollIntoView({block:"nearest"})});
+$("#aiAgainCancel").addEventListener("click",()=>{$("#aiAgainRow").hidden=true});
+$("#aiAgainRow").addEventListener("click",e=>{const b=e.target.closest("[data-again]");if(b)runAi({again:b.dataset.again})});
 function aiPlain(){return AI.text.replace(/^#{1,4}\s+/gm,"").replace(/\*\*(.+?)\*\*/g,"$1")}
 $("#aiCopy").addEventListener("click",()=>{ if(AI.text) copyText(aiRefText()+" ("+VERS[AI.ctx.ver].name+")\n\n"+aiPlain()); });
 $("#aiSave").addEventListener("click",()=>{
