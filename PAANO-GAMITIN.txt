@@ -13,6 +13,14 @@ SA PHONE (parehong Wi-Fi ng PC)
 - Paalala: sa ganitong link (http + IP address), gumagana ang app pero HINDI ito
   ma-i-install at HINDI gagana offline. Patakaran ito ng browsers: kailangan ng https.
   Sa PC (localhost), gumagana ang install at offline.
+- (2026-11-21) May QR code sa itim na window: i-scan ito ng phone para mabuksan ang link.
+- PARA MA-INSTALL SA PHONE AT GUMANA OFFLINE: gamitin ang naka-host na https link (Render).
+  Ilagay ito sa .env ng PC:  PUBLIC_URL=https://iyong-app.onrender.com/
+  Pagkatapos, ang phones na nasa Wi-Fi link ay makakakita ng "I-install ang app" na may link,
+  at may pangalawang QR code sa itim na window para sa https link.
+  Buksan ito habang may internet, tapos Install / Add to Home screen. Gagana na kahit offline
+  (basa, hanap, reading plan, larawan, notes). Ang AI at ang pag-share sa FB ay kailangan pa rin ng internet.
+- Paalala: hiwalay ang bookmarks, highlights, notes at reading plan sa Wi-Fi link at sa https link.
 
 I-INSTALL SA PC (parang totoong app)
 - Sa Chrome/Edge, buksan ang http://localhost:8080 tapos i-click ang install icon sa address bar.

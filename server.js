@@ -18,7 +18,16 @@ const TYPES = {".html":"text/html; charset=utf-8",".js":"text/javascript; charse
   ".webmanifest":"application/manifest+json",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp",".woff2":"font/woff2",".txt":"text/plain; charset=utf-8"};
 const GZ = new Set([".html",".js",".json",".webmanifest",".txt"]);
 const gzCache = new Map();
-const BLOCK = new Set(["server.js","start-bible.cmd","ai-cache.json","download-commentary.js","download-commentary.cmd","package.json","package-lock.json"]);
+const BLOCK = new Set(["server.js","qr.js","start-bible.cmd","ai-cache.json","download-commentary.js","download-commentary.cmd","package.json","package-lock.json"]);
+
+// ---------- naka-host na link (2026-11-21) ----------
+// PUBLIC_URL = https link ng naka-host na app (hal. sa Render). Sa PC sa simbahan (LAN, http), ipinapakita ito sa phones
+// para doon nila i-install ang app at magamit offline. Https lang ang tinatanggap.
+const PUBLIC_URL = (() => {
+  const v = (process.env.PUBLIC_URL || "").trim();
+  try { const u = new URL(v); return u.protocol === "https:" && v.length <= 200 ? u.href : ""; } catch { return ""; }
+})();
+if (process.env.PUBLIC_URL && !PUBLIC_URL) console.warn("  Paalala: hindi tinanggap ang PUBLIC_URL sa .env (dapat https://..., hanggang 200 letra).");
 
 // ---------- AI settings ----------
 const AI_KEY = process.env.GEMINI_API_KEY || "";
@@ -303,7 +312,7 @@ http.createServer((req, res) => {
   try { url = new URL(req.url, "http://x"); p = decodeURIComponent(url.pathname); } catch { res.writeHead(400); return res.end(); }
   if (p === "/api/ai") return handleAi(req, res).catch(e => sendJson(res, 500, {error: "May error sa server."}));
   if (p === "/api/commentary") return handleCommentary(req, res, url).catch(e => sendJson(res, 500, {error: "May error sa server."}));
-  if (p === "/api/status") return sendJson(res, 200, {ai: !!AI_KEY});
+  if (p === "/api/status") return sendJson(res, 200, {ai: !!AI_KEY, publicUrl: PUBLIC_URL});
   if (p === "/api/ip") return DEBUG_IP ? sendJson(res, 200, ipReport(req)) : sendJson(res, 404, {error: "Hindi makita"});
   if (p.endsWith("/")) p += "index.html";
   const file = path.normalize(path.join(ROOT, p));
@@ -330,8 +339,20 @@ http.createServer((req, res) => {
 }).listen(PORT, "0.0.0.0", () => {
   console.log("\n  Bibliya ng Iglesia - tumatakbo na!\n");
   console.log("  Sa PC na ito:      http://localhost:" + PORT);
+  const lan = [];
   for (const list of Object.values(os.networkInterfaces())) for (const a of list || [])
-    if (a.family === "IPv4" && !a.internal) console.log("  Sa phone (same Wi-Fi): http://" + a.address + ":" + PORT);
+    if (a.family === "IPv4" && !a.internal) lan.push("http://" + a.address + ":" + PORT);
+  for (const u of lan) console.log("  Sa phone (same Wi-Fi): " + u);
+  if (PUBLIC_URL) console.log("  Pang-install at offline (may internet): " + PUBLIC_URL);
+  // 2026-11-21: QR code para i-scan ng phone. Hindi ipinapakita sa naka-host na server (Render) o kapag SHOW_QR=0.
+  const hosted = process.env.RENDER || process.env.TRUST_PROXY === "1";
+  if (!hosted && process.env.SHOW_QR !== "0") {
+    try {
+      const {qrTerminal} = require("./qr.js");
+      if (lan[0]) console.log("\n  I-scan para buksan sa phone (same Wi-Fi):\n" + qrTerminal(lan[0]).replace(/^/gm, "  "));
+      if (PUBLIC_URL) console.log("\n  I-scan para i-install ang app (kailangan ng internet):\n" + qrTerminal(PUBLIC_URL).replace(/^/gm, "  "));
+    } catch (e) { /* QR is optional */ }
+  }
   console.log("\n  AI (Paliwanag/Sermon): " + (AI_KEY ? "ON (" + AI_MODEL + ", limit " + AI_DAILY_LIMIT + "/araw)" : "OFF - walang GEMINI_API_KEY sa .env (tingnan ang PAANO-GAMITIN.txt)"));
   console.log("\n  Isara ang window na ito para ihinto.\n");
 }).on("error", e => { console.error(e.code === "EADDRINUSE" ? "Gamit na ang port " + PORT + ". Subukan: set PORT=8081 && node server.js" : e.message); process.exit(1); });

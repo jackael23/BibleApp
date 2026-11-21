@@ -8,3 +8,6 @@ GEMINI_API_KEY=ilagay-dito-ang-key-mo
 # AI_DEADLINE_MS=60000  (kabuuang hintay, kasama ang fallback)
 # AI_DAILY_LIMIT=200
 # AI_PER_DEVICE=15
+# PUBLIC_URL=https://iyong-app.onrender.com/   (sa PC sa simbahan lang: https link ng naka-host na app.
+#   Ipinapakita sa phones na naka-Wi-Fi para doon i-install ang app at magamit offline. May QR din sa itim na window.)
+# SHOW_QR=0   (para hindi ipakita ang QR code sa itim na window)

@@ -301,6 +301,13 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
 .churchhead .cname{font-family:var(--font-display);font-weight:700;font-size:22px;line-height:1.2;overflow-wrap:anywhere}
 .churchhead .ctag{font-size:14px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
 .churchhead .ctag:empty{display:none}
+/* 2026-11-21 — paalala sa LAN (http): dito hindi ma-install; ituro ang https link */
+#installCard[hidden]{display:none}
+#installCard .url{font-size:14px;word-break:break-all;background:var(--accent-soft);border-radius:4px;padding:8px 10px}
+#installCard .row{justify-content:flex-end}
+#installCard .tipnote{font-size:13px;color:var(--muted)}
+#installCard p{margin:0}
+#installCard a.btn{text-decoration:none;color:var(--accent-ink);display:inline-block}
 </style>
 </head>
 <body>
@@ -318,6 +325,7 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
       <div class="churchhead" id="churchHead" hidden><img id="churchLogo" alt="" hidden><div style="min-width:0"><div class="cname" id="churchName"></div><div class="ctag" id="churchTag"></div></div></div>
       <div class="date" id="today"></div>
       <div class="stack">
+        <div class="card" id="installCard" hidden></div>
         <article class="votd" aria-labelledby="votdLabel">
           <div class="label" id="votdLabel">Talata para sa araw na ito</div>
           <blockquote id="votdText" class="loading">Kinukuha ang talata…</blockquote>
@@ -1234,6 +1242,33 @@ fetch("church.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null).catch(()=>un
   if(j===undefined) return; // offline / network error: keep the last good copy
   const c=cleanChurch(j); store.set("church",c); applyChurch(c);
 });
+
+/* ---------- paalala sa LAN na http (2026-11-21) ---------- */
+// On the church PC's Wi-Fi link (http://<IP>:8080) the app cannot be installed or work offline (browsers need https).
+// Point members to the hosted https link (PUBLIC_URL on the PC's .env) instead.
+const LAN_HTTP = location.protocol==="http:" && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+function showInstallTip(url){
+  const card=$("#installCard");
+  card.innerHTML=`<div class="label">I-install ang app</div>
+    <p style="font-size:15px">Sa link na ito (Wi-Fi ng simbahan), hindi ma-install ang app at hindi ito gagana kapag walang Wi-Fi.</p>`+
+    (url?`<p style="font-size:15px">Buksan ang link na ito habang may internet, tapos piliin ang <b>Install</b> o <b>Add to Home screen</b>. Pagkatapos, gagana na ito kahit offline.</p>
+    <div class="url">${esc(url)}</div>
+    <p class="tipnote">Paalala: hiwalay ang bookmarks, highlights, notes at reading plan sa dalawang link.</p>
+    <div class="row"><button class="btn small ghost" data-tip="off">Huwag nang ipakita</button><button class="btn small ghost" data-tip="copy">Kopyahin</button><a class="btn small" href="${esc(url)}" target="_blank" rel="noopener">Buksan</a></div>`
+    :`<p class="tipnote">Itanong sa admin ng app ang https link para ma-install ito.</p><div class="row"><button class="btn small ghost" data-tip="off">Huwag nang ipakita</button></div>`);
+  card.hidden=false;
+  card.onclick=e=>{
+    const a=e.target.closest("[data-tip]")?.dataset.tip;
+    if(a==="copy") copyText(url);
+    if(a==="off"){store.set("lanTipOff",true);card.hidden=true}
+  };
+}
+if(LAN_HTTP && !store.get("lanTipOff",false)){
+  fetch("api/status",{cache:"no-store"}).then(r=>r.ok?r.json():{}).catch(()=>({})).then(j=>{
+    let url=""; try{const u=new URL(j&&j.publicUrl);if(u.protocol==="https:"&&u.href.length<=200)url=u.href}catch(e){}
+    showInstallTip(url);
+  });
+}
 
 /* ---------- settings ---------- */
 function applySettings(){
