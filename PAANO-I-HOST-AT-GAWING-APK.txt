@@ -90,6 +90,11 @@ HAKBANG 5 - I-install sa phone
 2. Buksan > payagan ang "Install unknown apps" kapag nagtanong > Install.
 3. Kapag may address bar pa sa itaas ng app: mali o hindi pa naka-deploy ang
    assetlinks.json (balikan ang Hakbang 4).
+4. (2026-11-21) Walang APK? Pwede ring i-install mula sa browser: buksan ang https link sa
+   Chrome habang may internet > menu > "Install app" / "Add to Home screen". Gagana ito offline.
+5. Sa PC sa simbahan (Wi-Fi/LAN): ilagay sa .env ng PC ang  PUBLIC_URL=<https link ng Render>
+   para ituro ng app sa phones ang link na pang-install (may QR din sa itim na window).
+   HINDI kailangan ang PUBLIC_URL sa Render mismo.
 
 ----------------------------------------------------------------------------
 SA SUSUNOD - Google Play Store
