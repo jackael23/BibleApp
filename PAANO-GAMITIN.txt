@@ -104,3 +104,17 @@ PAALALA ARAW-ARAW - idinagdag 2026-11-21
 - Ang calendar ng phone ang magpapaalala araw-araw (kahit nakasara ang app at walang internet).
   Pagpindot sa link sa event, bubukas ang app sa babasahin ngayon.
 - Para itigil: buksan ang event sa calendar at burahin ang lahat ng susunod.
+
+SUBSCRIPTION PARA SA AI - idinagdag 2026-11-21
+- Bawat phone: 3 libreng tanong sa AI bawat araw (Paliwanag, Sermon, Bagong paliwanag, Magtanong).
+  Libre at hindi binibilang ang paliwanag na nagawa na dati. Laging libre ang Matthew Henry.
+- Para sa mas marami: subscription code. Ilagay sa Ayos > Subscription (AI) > I-activate.
+- PARA SA ADMIN:
+  1. Sa .env (at sa Render), ilagay ang SUB_SECRET (16+ letra), ADMIN_PASSWORD (8+ letra) at SUB_INFO
+     (presyo at paano magbayad). PAREHONG SUB_SECRET sa PC at sa Render. Huwag itong ibahagi:
+     sinumang may hawak nito ay makakagawa ng code.
+  2. Kapag nakabayad ang member: buksan ang /admin.html (hal. http://localhost:8080/admin.html),
+     ilagay ang password, piliin ang haba (1 buwan, 1 taon, o petsa), Gumawa ng code, ibigay sa member.
+  3. Ang listahan ng code ay nasa browser ng admin lang (walang database).
+  4. Para ihinto ang code bago matapos: idagdag ang ID nito sa SUB_REVOKED, tapos i-restart.
+- Kapag walang SUB_SECRET: naka-off ang subscription at libre ang AI (gaya ng dati).
