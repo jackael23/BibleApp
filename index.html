@@ -328,6 +328,19 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
 .aisaved[hidden]{display:none}
 .aisaved b{color:var(--ink);font-weight:600}
 #aiSave[aria-disabled="true"]{opacity:.75}
+/* 2026-11-21 — Usapan tungkol sa talata */
+.aichat{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.aichat[hidden],#chatBox[hidden],.chattools[hidden]{display:none}
+.chatopen{width:100%}
+.chatlog{display:grid;gap:10px;margin:10px 0}
+.chatlog .q{justify-self:end;max-width:85%;background:var(--accent);color:var(--accent-ink);border-radius:12px 12px 2px 12px;padding:8px 12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.chatlog .a{justify-self:start;max-width:95%;background:var(--surface);border:1px solid var(--line);border-radius:12px 12px 12px 2px;padding:8px 12px;overflow-wrap:anywhere}
+.chatlog .a > :first-child{margin-top:0}.chatlog .a > :last-child{margin-bottom:0}
+.chatlog .a.err{border-color:#b5483b}
+.chatform textarea{width:100%;font:inherit;font-size:16px;padding:8px 10px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--ink);resize:vertical}
+.chatrow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px}
+.chatcount{font-size:13px;color:var(--muted)}
+.chattools{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:10px}
 </style>
 </head>
 <body>
@@ -564,6 +577,23 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
     </div>
   </div>
   <div id="aiBody" class="aibody" aria-live="polite"></div>
+  <!-- 2026-11-21: Usapan tungkol sa talata (follow-up na tanong sa AI) -->
+  <div class="aichat" id="aiChat" hidden>
+    <button class="btn ghost chatopen" id="chatOpen" type="button">Magtanong tungkol dito</button>
+    <div id="chatBox" hidden>
+      <div class="label">Usapan tungkol sa talatang ito</div>
+      <div id="chatLog" class="chatlog" aria-live="polite"></div>
+      <form id="chatForm" class="chatform">
+        <textarea id="chatQ" rows="2" maxlength="500" placeholder="Hal. Ano ang ibig sabihin nito? Paano ko ito ituturo sa mga bata?" aria-label="Ang tanong mo"></textarea>
+        <div class="chatrow"><span class="chatcount" id="chatCount"></span><button class="btn small" type="submit" id="chatSend">Itanong</button></div>
+      </form>
+      <div class="chattools" id="chatTools" hidden>
+        <button class="btn small ghost" type="button" id="chatNew">Bagong usapan</button>
+        <button class="btn small ghost" type="button" id="chatCopy">Kopyahin ang usapan</button>
+        <button class="btn small ghost" type="button" id="chatSave">I-save ang usapan</button>
+      </div>
+    </div>
+  </div>
   <div class="aiacts" id="aiActs" hidden>
     <button class="btn small ghost" id="aiRetry" hidden>Subukan ulit</button>
     <button class="btn small ghost" id="aiAgain" hidden>Bagong paliwanag</button>
@@ -886,7 +916,7 @@ function dialog(title,html,buttons){
 }
 
 /* ---------- AI: Paliwanag / Sermon / Matthew Henry (2026-11-19) ---------- */
-const AI = {ctx:null, mode:"explain", lang:"tl", text:"", seq:0, mem:{}};
+const AI = {ctx:null, mode:"explain", lang:"tl", text:"", seq:0, mem:{}, chats:{}};
 function mdToHtml(md){
   const inline=t=>esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g,"$1<i>$2</i>");
   let html="", list="";
@@ -922,11 +952,12 @@ async function runAi(opt){
   const memKey=[AI.mode,AI.mode==="mh"?"":AI.lang,x.ver,x.b,x.c,x.verses.join(",")].join("|");
   // 2026-11-21: "again" = new version of the answer (the previous one is sent so it really differs)
   const again=opt&&opt.again&&AI.mode!=="mh"&&AGAIN_NAME[opt.again]?opt.again:"", prev=again?(AI.mem[memKey]||null):null;
-  AI.lastAgain=again; AI.text=""; AI.tag=""; syncAiSaved(); $("#aiActs").hidden=true; $("#aiRetry").hidden=true; $("#aiAgain").hidden=true; $("#aiAgainRow").hidden=true;
+  AI.lastAgain=again; AI.text=""; AI.tag=""; syncAiSaved(); $("#aiChat").hidden=true; $("#aiActs").hidden=true; $("#aiRetry").hidden=true; $("#aiAgain").hidden=true; $("#aiAgainRow").hidden=true;
   const data=DATA[x.ver];
   const quote = data? `<div class="vq">${esc(x.verses.map(v=>(x.verses.length>1?v+" ":"")+(data[x.b][x.c-1][v-1]||"")).join(" "))}<div class="src">${esc(aiRefText())} (${VERS[x.ver].name})</div></div>` : "";
   const show=(html,text,tag)=>{ if(seq!==AI.seq) return; body.innerHTML=quote+html; AI.text=text||""; AI.tag=tag||""; syncAiSaved(); $("#aiActs").hidden=!text; $("#aiSave").hidden=$("#aiCopy").hidden=!text;
-    $("#aiAgain").hidden=!text||AI.mode==="mh"; $("#aiAgain").textContent=AI.mode==="sermon"?"Bagong sermon":"Bagong paliwanag"; };
+    $("#aiAgain").hidden=!text||AI.mode==="mh"; $("#aiAgain").textContent=AI.mode==="sermon"?"Bagong sermon":"Bagong paliwanag";
+    AI.key=memKey; $("#aiChat").hidden=!text||AI.mode==="mh"; renderChat(); };
   const fail=(msg,offerMh)=>{ if(seq!==AI.seq) return; body.innerHTML=quote+`<p>${esc(msg)}</p>`+(offerMh?`<p><button class="btn small" id="aiToMh">Basahin ang Matthew Henry</button></p>`:"");
     $("#aiActs").hidden=false; $("#aiRetry").hidden=false; $("#aiCopy").hidden=$("#aiSave").hidden=true;
     const b=$("#aiToMh"); if(b) b.onclick=()=>{AI.mode="mh";runAi()}; };
@@ -954,6 +985,7 @@ async function runAi(opt){
     }
     const html=(again?`<p class="aiver">Bagong bersyon · ${esc(AGAIN_NAME[again])}</p>`:"")+mdToHtml(j.text);
     const tag=again?AGAIN_NAME[again]:"";
+    if(again) delete AI.chats[memKey]; // the conversation was about the earlier version
     AI.mem[memKey]={html,text:j.text,tag}; show(html,j.text,tag);
   }catch(e){
     if(again&&prev&&seq===AI.seq){show(prev.html,prev.text,prev.tag);toast(navigator.onLine===false?"Walang koneksyon. Subukan ulit.":"Hindi nakuha ang bagong bersyon. Subukan ulit.");return}
@@ -989,6 +1021,60 @@ $("#aiSave").addEventListener("click",()=>{
   store.set("notes",NOTES); if(current==="basahin") renderChapter(); syncAiSaved(); toast("Na-save sa notes");
 });
 $("#aiOpenNotes").addEventListener("click",()=>{S.savedTab="notes";saveSettings();closeSheets();go("naka-save")});
+
+/* ---------- usapan tungkol sa talata (2026-11-21) ---------- */
+// Follow-up questions about the passage + the AI answer shown. Kept in memory for this session (save to notes to keep).
+const CHAT_MAX=10, CHAT_QMAX=500;
+function chatState(){const k=AI.key; return AI.chats[k]||(AI.chats[k]={turns:[],open:false,busy:false,err:null})}
+const plainMd=t=>String(t||"").replace(/^#{1,4}\s+/gm,"").replace(/\*\*(.+?)\*\*/g,"$1");
+function renderChat(){
+  if($("#aiChat").hidden) return;
+  const st=chatState();
+  $("#chatOpen").hidden=st.open; $("#chatBox").hidden=!st.open;
+  if(!st.open) return;
+  let html=st.turns.map(t=>`<div class="q">${esc(t.q)}</div><div class="a">${mdToHtml(t.a)}</div>`).join("");
+  if(st.busy) html+=`<div class="q">${esc(st.busy)}</div><div class="a muted"><span class="spin"></span>Pinag-iisipan…</div>`;
+  else if(st.err) html+=`<div class="q">${esc(st.err.q)}</div><div class="a err"><p>${esc(st.err.msg)}</p><p><button class="btn small" type="button" id="chatRetry">Subukan ulit</button></p></div>`;
+  $("#chatLog").innerHTML=html;
+  const full=st.turns.length>=CHAT_MAX;
+  $("#chatCount").textContent=full?"Naabot na ang "+CHAT_MAX+" tanong. Pindutin ang Bagong usapan.":st.turns.length+"/"+CHAT_MAX+" tanong";
+  $("#chatQ").disabled=$("#chatSend").disabled=full||!!st.busy;
+  $("#chatTools").hidden=!st.turns.length;
+  const saved=chatIsSaved(); $("#chatSave").textContent=saved?"Naka-save ✓":"I-save ang usapan";
+  const r=$("#chatRetry"); if(r) r.onclick=()=>{const q=st.err.q;st.err=null;sendChat(q)};
+}
+async function sendChat(question){
+  const st=chatState(), key=AI.key, x=AI.ctx;
+  question=String(question||"").replace(/\s+/g," ").trim();
+  if(!question||st.busy) return;
+  if(question.length>CHAT_QMAX){toast("Hanggang "+CHAT_QMAX+" letra lang ang tanong");return}
+  if(st.turns.length>=CHAT_MAX) return;
+  st.busy=question; st.err=null; renderChat(); $("#chatLog").lastElementChild?.scrollIntoView({block:"nearest"});
+  let msg="";
+  try{
+    const r=await fetch("api/chat",{method:"POST",signal:(AbortSignal.timeout?AbortSignal.timeout(80000):undefined),headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({mode:AI.mode,lang:AI.lang,ver:x.ver,b:x.b,c:x.c,verses:x.verses,answer:AI.text,history:st.turns,question})});
+    const j=await r.json().catch(()=>({error:"Walang sagot ang server."}));
+    if(r.ok&&j.text) st.turns.push({q:question,a:j.text}); else msg=j.error||"May error ang AI.";
+  }catch(e){ msg=navigator.onLine===false?"Walang koneksyon. Paki-check ang internet o Wi-Fi.":(e&&e.name==="TimeoutError")?"Natagalan ang sagot. Subukan ulit.":"Hindi maabot ang server ng app. Subukan ulit."; }
+  st.busy=false; if(msg) st.err={q:question,msg};
+  if(AI.key===key){ renderChat(); const as=$("#chatLog").querySelectorAll(".a"); as[as.length-1]?.scrollIntoView({block:"start",behavior:"smooth"}); }
+}
+function chatText(){return chatState().turns.map(t=>"Tanong: "+t.q+"\nSagot: "+plainMd(t.a)).join("\n\n")}
+function chatIsSaved(){const st=chatState();if(!st.turns.length)return false;const n=NOTES[aiNoteKey()];return !!(n&&n.t&&n.t.includes(chatText()))}
+$("#chatOpen").addEventListener("click",()=>{chatState().open=true;renderChat();$("#chatQ").focus()});
+$("#chatForm").addEventListener("submit",e=>{e.preventDefault();const q=$("#chatQ").value;if(!q.trim())return;$("#chatQ").value="";sendChat(q)});
+$("#chatQ").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();$("#chatForm").requestSubmit()}});
+$("#chatNew").addEventListener("click",()=>{const st=chatState();if(st.busy)return;st.turns=[];st.err=null;renderChat();$("#chatQ").focus()});
+$("#chatCopy").addEventListener("click",()=>{if(chatState().turns.length)copyText(aiRefText()+" ("+VERS[AI.ctx.ver].name+") — Usapan\n\n"+chatText())});
+$("#chatSave").addEventListener("click",()=>{
+  if(!chatState().turns.length) return;
+  if(chatIsSaved()){toast("Naka-save na ang usapang ito");return}
+  const k=aiNoteKey(), d=new Date();
+  const add="[Usapan (AI) · "+d.getDate()+" "+MONTHS[d.getMonth()].slice(0,3)+" "+d.getFullYear()+"]\n"+chatText();
+  NOTES[k]={t:NOTES[k]?.t?NOTES[k].t+"\n\n"+add:add,ts:Date.now(),ver:AI.ctx.ver};
+  store.set("notes",NOTES); if(current==="basahin") renderChapter(); renderChat(); syncAiSaved(); toast("Na-save sa notes");
+});
 
 /* ---------- search ---------- */
 let scope=S.scope;

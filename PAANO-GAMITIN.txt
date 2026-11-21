@@ -43,6 +43,10 @@ PALIWANAG AT SERMON (AI) - idinagdag 2026-11-19
   Para sa iyo lang ang bagong bersyon; i-save sa notes kung gusto mong itago.
 - "Kopyahin" at "I-save sa notes" ay laging nasa ibaba ng sagot. Kapag na-save na, "Naka-save ✓"
   ang makikita (hindi nadodoble) at may "Buksan ang notes". May petsa ang bawat naka-save na sagot.
+- (2026-11-21) "Magtanong tungkol dito": makipag-usap sa AI tungkol sa talata at sa paliwanag
+  (hal. "Paano ko ito ituturo sa mga bata?"). Hanggang 10 tanong bawat usapan; bawat tanong ay
+  bilang sa limit ng AI. Bibliya at pananampalataya lang ang sinasagot. Mawawala ang usapan
+  kapag isinara ang app, kaya pindutin ang "I-save ang usapan" kung gusto mong itago.
 
 PAANO I-SETUP ANG AI (isang beses lang, sa PC)
 1. Kumuha ng libreng Gemini API key: https://aistudio.google.com/apikey
