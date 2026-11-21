@@ -341,6 +341,11 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
 .chatrow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px}
 .chatcount{font-size:13px;color:var(--muted)}
 .chattools{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:10px}
+/* 2026-11-21 — Subscription (AI) */
+.aiquota{font-size:13px;color:var(--muted);margin-top:12px}
+.aiquota[hidden],#subItem[hidden],#subRemove[hidden]{display:none}
+#subCode{text-transform:uppercase;letter-spacing:.04em}
+#subStatus b{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -459,6 +464,17 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
             <b>KJV</b> · King James Version (1769). Public domain.<br>
             <b>WEB</b> · World English Bible. Public domain.
           </div>
+        </div>
+        <!-- 2026-11-21: Subscription para sa AI (activation code) -->
+        <div class="item" id="subItem" hidden>
+          <span class="label">Subscription (AI)</span>
+          <div class="about" id="subStatus"></div>
+          <form id="subForm" class="searchbox" style="margin:0">
+            <input id="subCode" type="text" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40" aria-label="Subscription code">
+            <button class="btn" type="submit">I-activate</button>
+          </form>
+          <div class="about" id="subInfo"></div>
+          <div><button class="btn small ghost" type="button" id="subRemove" hidden>Alisin ang code sa phone na ito</button></div>
         </div>
         <div class="item">
           <span class="label">Iyong data</span>
@@ -611,6 +627,7 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
     </div>
     <div class="row" style="justify-content:flex-end"><button class="btn small ghost" id="aiAgainCancel">Huwag na</button></div>
   </div>
+  <div class="aiquota" id="aiQuota" hidden></div>
   <div class="ainote" id="aiNote"></div>
 </div>
 
@@ -721,6 +738,7 @@ function show(view){
   if(view==="ngayon") renderHome();
   if(view==="basahin") renderChapter();
   if(view==="naka-save") renderSaved();
+  if(view==="ayos") renderSub();
   if(view==="hanapin") $("#searchVer").textContent = "sa "+VERS[S.ver].name;
   $("#main").scrollTop = 0;
 }
@@ -943,6 +961,7 @@ function syncAiBar(){
   syncSeg("#aiModeSeg","m",AI.mode); syncSeg("#aiLangSeg","l",AI.lang);
   $("#aiLangSeg").hidden = AI.mode==="mh";
   $("#aiTitle").textContent = {explain:"Paliwanag",sermon:"Sermon",mh:"Matthew Henry"}[AI.mode]+" · "+aiRefText();
+  renderQuotaLine();
   $("#aiNote").innerHTML = AI.mode==="mh" ? "Lumang komentaryo (1706), English lang. Public domain." : "Gawa ng AI (Gemini) kaya pwedeng magkamali. Ikumpara sa Bibliya at itanong sa pastor bago ituro.";
 }
 const AGAIN_NAME={other:"Iba lang",simpler:"Mas simple",shorter:"Mas maikli",deeper:"Mas malalim"};
@@ -976,8 +995,10 @@ async function runAi(opt){
     }
     const req={mode:AI.mode,lang:AI.lang,ver:x.ver,b:x.b,c:x.c,verses:x.verses};
     if(again){req.again=again; if(prev&&prev.text) req.prev=prev.text}
-    const r=await fetch("api/ai",{method:"POST",signal:(AbortSignal.timeout?AbortSignal.timeout(80000):undefined),headers:{"Content-Type":"application/json"},body:JSON.stringify(req)});
+    const r=await fetch("api/ai",{method:"POST",signal:(AbortSignal.timeout?AbortSignal.timeout(80000):undefined),headers:aiHeaders(),body:JSON.stringify(req)});
     const j=await r.json().catch(()=>({error:"Walang sagot ang server."}));
+    noteQuota(j.quota);
+    if(r.status===402) quotaDialog(j);
     if(!r.ok){
       // A failed "new version" keeps the earlier answer on screen.
       if(again&&prev&&seq===AI.seq){show(prev.html,prev.text,prev.tag);toast(j.error||"May error ang AI.");return}
@@ -1052,9 +1073,10 @@ async function sendChat(question){
   st.busy=question; st.err=null; renderChat(); $("#chatLog").lastElementChild?.scrollIntoView({block:"nearest"});
   let msg="";
   try{
-    const r=await fetch("api/chat",{method:"POST",signal:(AbortSignal.timeout?AbortSignal.timeout(80000):undefined),headers:{"Content-Type":"application/json"},
+    const r=await fetch("api/chat",{method:"POST",signal:(AbortSignal.timeout?AbortSignal.timeout(80000):undefined),headers:aiHeaders(),
       body:JSON.stringify({mode:AI.mode,lang:AI.lang,ver:x.ver,b:x.b,c:x.c,verses:x.verses,answer:AI.text,history:st.turns,question})});
     const j=await r.json().catch(()=>({error:"Walang sagot ang server."}));
+    noteQuota(j.quota); if(r.status===402) quotaDialog(j);
     if(r.ok&&j.text) st.turns.push({q:question,a:j.text}); else msg=j.error||"May error ang AI.";
   }catch(e){ msg=navigator.onLine===false?"Walang koneksyon. Paki-check ang internet o Wi-Fi.":(e&&e.name==="TimeoutError")?"Natagalan ang sagot. Subukan ulit.":"Hindi maabot ang server ng app. Subukan ulit."; }
   st.busy=false; if(msg) st.err={q:question,msg};
@@ -1075,6 +1097,59 @@ $("#chatSave").addEventListener("click",()=>{
   NOTES[k]={t:NOTES[k]?.t?NOTES[k].t+"\n\n"+add:add,ts:Date.now(),ver:AI.ctx.ver};
   store.set("notes",NOTES); if(current==="basahin") renderChapter(); renderChat(); syncAiSaved(); toast("Na-save sa notes");
 });
+
+/* ---------- subscription para sa AI (2026-11-21) ---------- */
+// The phone sends a random device id (for the daily free questions) and the activation code, if any.
+function devId(){
+  let d=store.get("devid","");
+  if(!/^[a-f0-9]{32}$/.test(d)){const a=new Uint8Array(16);crypto.getRandomValues(a);d=[...a].map(x=>x.toString(16).padStart(2,"0")).join("");store.set("devid",d)}
+  return d;
+}
+let SUB=(()=>{const v=store.get("sub",null);return v&&typeof v.code==="string"&&v.code.length<=40?v:null})();
+function aiHeaders(){const h={"Content-Type":"application/json","X-Device":devId()};if(SUB)h["X-Sub-Code"]=SUB.code;return h}
+let QUOTA=null;
+function noteQuota(q){if(q&&typeof q==="object"&&typeof q.mode==="string"){QUOTA=q;renderQuotaLine()}}
+function quotaText(q){
+  if(!q||q.mode==="open") return "";
+  if(q.mode==="sub") return "Subscription hanggang "+q.until+" · "+q.left+" sa "+q.limit+" tanong sa AI ang natitira ngayong araw";
+  return "Libreng AI ngayong araw: "+q.left+" sa "+q.limit+" ang natitira (libre ang mga paliwanag na nagawa na dati)";
+}
+function renderQuotaLine(){const el=$("#aiQuota"),t=AI.mode==="mh"?"":quotaText(QUOTA);el.textContent=t;el.hidden=!t}
+function openSubSettings(){closeSheets();go("ayos");setTimeout(()=>{$("#subItem").scrollIntoView({block:"center"});$("#subCode").focus()},150)}
+function quotaDialog(j){
+  dialog("Naubos na ang AI ngayong araw",`<p>${esc(j.error||"")}</p>`+(j.info?`<p class="muted" style="font-size:15px">${esc(j.info)}</p>`:""),[["Mamaya",null],["Ilagay ang code",openSubSettings,"go"]]);
+}
+async function renderSub(){
+  let j=null;
+  try{const r=await fetch("api/sub",{headers:aiHeaders(),cache:"no-store"});j=await r.json()}catch(e){}
+  const item=$("#subItem");
+  if(!j){ // offline or no server: show only when a code is saved
+    item.hidden=!SUB; $("#subStatus").textContent="Hindi ma-check ngayon (walang koneksyon sa server)."; $("#subRemove").hidden=!SUB; return;
+  }
+  if(!j.enabled){item.hidden=true;return}
+  item.hidden=false; noteQuota(j.quota);
+  const q=j.quota||{}, c=j.check;
+  let html="";
+  if(SUB&&c&&c.ok) html=`<b>Aktibo</b> hanggang <b>${esc(c.until)}</b>. ${q.left} sa ${q.limit} tanong sa AI ang natitira ngayong araw.`;
+  else{
+    if(SUB&&c&&!c.ok) html+=`<b>${esc(c.error)}</b><br>`;
+    html+=`Libre: <b>${q.left??j.free} sa ${q.limit??j.free}</b> tanong sa AI ang natitira ngayong araw. Libre at hindi binibilang ang mga paliwanag na nagawa na dati (hal. sikat na talata). Ang Matthew Henry ay laging libre.`;
+  }
+  $("#subStatus").innerHTML=html;
+  $("#subInfo").textContent=j.info||"Para makakuha ng subscription code, makipag-ugnayan sa admin ng simbahan.";
+  $("#subRemove").hidden=!SUB;
+}
+$("#subForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const code=$("#subCode").value.trim().toUpperCase(); if(!code) return;
+  let j=null;
+  try{const r=await fetch("api/sub",{headers:{"X-Device":devId(),"X-Sub-Code":code},cache:"no-store"});j=await r.json();if(!r.ok){toast(j.error||"Hindi ma-check ang code");return}}
+  catch(err){toast("Walang koneksyon. Subukan ulit.");return}
+  if(!j.enabled){toast("Walang subscription sa server na ito (libre ang AI)");return}
+  if(j.check&&j.check.ok){SUB={code};store.set("sub",SUB);$("#subCode").value="";toast("Aktibo na hanggang "+j.check.until);renderSub()}
+  else toast((j.check&&j.check.error)||"Mali ang code");
+});
+$("#subRemove").addEventListener("click",()=>dialog("Alisin ang code?","<p>Babalik sa libreng AI bawat araw ang phone na ito. Pwede mong ilagay ulit ang code kahit kailan.</p>",[["Huwag",null],["Alisin",()=>{SUB=null;store.set("sub",null);QUOTA=null;renderSub();toast("Inalis ang code")},"danger-btn"]]));
 
 /* ---------- search ---------- */
 let scope=S.scope;

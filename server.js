@@ -201,6 +201,137 @@ function remember(text) {
   if (issued.size > 3000) { const old = [...issued].sort((a, b) => a[1] - b[1]).slice(0, issued.size - 3000); for (const [k] of old) issued.delete(k); }
 }
 
+// ---------- subscription para sa AI (2026-11-21) ----------
+// Activation codes: the code itself carries its end date and a secret signature (HMAC with SUB_SECRET),
+// so there is no database and nothing is lost when the server restarts. Without SUB_SECRET it is off (AI free as before).
+const SUB_SECRET = process.env.SUB_SECRET || "";
+const SUB_ON = SUB_SECRET.length >= 16;
+if (process.env.SUB_SECRET && !SUB_ON) console.warn("  Paalala: masyadong maikli ang SUB_SECRET (kailangan 16 letra pataas). Naka-off ang subscription.");
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
+const numEnv = (name, def) => { const v = Number(process.env[name]); return process.env[name] !== undefined && process.env[name] !== "" && Number.isFinite(v) && v >= 0 ? Math.floor(v) : def; };
+const FREE_PER_DAY = numEnv("FREE_AI_PER_DAY", 3);     // libreng tanong bawat phone bawat araw
+const FREE_PER_IP = numEnv("FREE_AI_PER_IP", 30);      // libreng tanong bawat IP bawat araw (pare-pareho ang IP sa iisang Wi-Fi)
+const SUB_PER_CODE = numEnv("SUB_DAILY_PER_CODE", 50); // bawat code bawat araw (para hindi sulit ipahiram)
+const SUB_REVOKED = new Set((process.env.SUB_REVOKED || "").toLowerCase().split(/[\s,]+/).filter(Boolean));
+const SUB_INFO = (process.env.SUB_INFO || "").trim().slice(0, 500);
+const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"; // Crockford base32 (walang I, L, O, U)
+const DAY0 = Date.UTC(2026, 0, 1);
+const phDay = (t = Date.now()) => Math.floor((t + 8 * 3600e3 - DAY0) / 864e5); // day number in Philippine time
+const dayDate = d => new Date(DAY0 + d * 864e5).toISOString().slice(0, 10);
+function b32enc(buf) {
+  let bits = 0, val = 0, out = "";
+  for (const b of buf) { val = (val << 8) | b; bits += 8; while (bits >= 5) { out += B32[(val >>> (bits - 5)) & 31]; bits -= 5; } val &= (1 << bits) - 1; }
+  if (bits > 0) out += B32[(val << (5 - bits)) & 31];
+  return out;
+}
+function b32dec(str) {
+  let bits = 0, val = 0; const out = [];
+  for (const ch of str) {
+    const i = B32.indexOf(ch); if (i < 0) return null;
+    val = (val << 5) | i; bits += 5;
+    if (bits >= 8) { out.push((val >>> (bits - 8)) & 255); bits -= 8; }
+    val &= (1 << bits) - 1;
+  }
+  return Buffer.from(out);
+}
+const subMac = body => crypto.createHmac("sha256", SUB_SECRET).update("bibliya-sub-v1|").update(body).digest().subarray(0, 6);
+// Code = 4 bytes id + 2 bytes last valid day + 6 bytes signature = 12 bytes = 20 characters (XXXX-XXXX-XXXX-XXXX-XXXX).
+function makeCode(lastDay) {
+  const body = Buffer.concat([crypto.randomBytes(4), Buffer.from([(lastDay >> 8) & 255, lastDay & 255])]);
+  const code = b32enc(Buffer.concat([body, subMac(body)]));
+  return {code: code.match(/.{4}/g).join("-"), id: body.subarray(0, 4).toString("hex"), until: dayDate(lastDay)};
+}
+function checkCode(raw) {
+  const norm = String(raw || "").toUpperCase().replace(/[\s-]/g, "").replace(/O/g, "0").replace(/[IL]/g, "1");
+  const bad = {ok: false, error: "Mali ang code. Paki-check ang pagkaka-type."};
+  if (!/^[0-9A-Z]{20}$/.test(norm)) return bad;
+  const buf = b32dec(norm);
+  if (!buf || buf.length !== 12 || b32enc(buf) !== norm) return bad;
+  const body = buf.subarray(0, 6);
+  if (!crypto.timingSafeEqual(subMac(body), buf.subarray(6))) return bad;
+  const id = body.subarray(0, 4).toString("hex"), lastDay = (body[4] << 8) | body[5], until = dayDate(lastDay);
+  if (SUB_REVOKED.has(id)) return {ok: false, id, error: "Hindi na gumagana ang code na ito. Makipag-ugnayan sa admin ng simbahan."};
+  if (phDay() > lastDay) return {ok: false, id, until, expired: true, error: "Nag-expire na ang code noong " + until + "."};
+  return {ok: true, id, until};
+}
+// Daily counts (in memory; a restart only resets today's counts).
+let quotaDay = -1; const freeDev = new Map(), freeIp = new Map(), codeUse = new Map();
+function rollDay() { const d = phDay(); if (d !== quotaDay) { quotaDay = d; freeDev.clear(); freeIp.clear(); codeUse.clear(); } }
+// What this request may use: "open" (subscription off), "sub" (valid code) or "free" (daily free questions per phone).
+function quotaOf(req) {
+  if (!SUB_ON) return {mode: "open"};
+  rollDay();
+  let codeError = "";
+  const raw = String(req.headers["x-sub-code"] || "").slice(0, 64);
+  if (raw) {
+    const c = checkCode(raw);
+    if (c.ok) return {mode: "sub", id: c.id, until: c.until, limit: SUB_PER_CODE, left: Math.max(0, SUB_PER_CODE - (codeUse.get(c.id) || 0))};
+    codeError = c.error;
+  }
+  const ip = clientIp(req), d = String(req.headers["x-device"] || ""), dev = /^[a-f0-9]{32}$/.test(d) ? d : "ip:" + ip;
+  const devLeft = FREE_PER_DAY - (freeDev.get(dev) || 0), ipLeft = FREE_PER_IP - (freeIp.get(ip) || 0);
+  const left = Math.max(0, Math.min(devLeft, ipLeft));
+  return {mode: "free", dev, ip, limit: FREE_PER_DAY, left, codeError, byNetwork: devLeft > 0 && ipLeft <= 0};
+}
+const quotaOk = qt => qt.mode === "open" || qt.left > 0;
+function charge(qt) {
+  if (qt.mode === "sub") codeUse.set(qt.id, (codeUse.get(qt.id) || 0) + 1);
+  else if (qt.mode === "free") { freeDev.set(qt.dev, (freeDev.get(qt.dev) || 0) + 1); freeIp.set(qt.ip, (freeIp.get(qt.ip) || 0) + 1); }
+  if (qt.mode !== "open") qt.left = Math.max(0, qt.left - 1);
+}
+function publicQuota(qt) {
+  if (qt.mode === "open") return {mode: "open"};
+  const o = {mode: qt.mode, left: qt.left, limit: qt.limit};
+  if (qt.until) o.until = qt.until;
+  if (qt.codeError) o.codeError = qt.codeError;
+  return o;
+}
+function quotaRefusal(res, qt) {
+  const more = " Para sa mas marami, maglagay ng subscription code (Ayos › Subscription).";
+  const error = qt.mode === "sub"
+    ? "Naabot na ang " + SUB_PER_CODE + " tanong sa AI ngayong araw para sa code na ito. Subukan ulit bukas."
+    : (qt.codeError ? qt.codeError + " " : "") + (
+      FREE_PER_DAY === 0 ? "Kailangan ng subscription code para magamit ang AI (Ayos › Subscription)."
+      : qt.byNetwork ? "Naubos na ang libreng AI para sa Wi-Fi o network na ito ngayong araw (marami ang gumagamit dito)." + more
+      : "Naubos na ang " + FREE_PER_DAY + " libreng tanong sa AI ngayong araw." + more);
+  return sendJson(res, 402, {error, code: "quota", quota: publicQuota(qt), info: SUB_INFO});
+}
+// Small rate limit for code checks and admin logins (per IP).
+const hits = new Map();
+function tooMany(kind, ip, max, ms) {
+  const now = Date.now(), k = kind + "|" + ip, list = (hits.get(k) || []).filter(t => now - t < ms);
+  hits.set(k, list);
+  if (hits.size > 5000) for (const [key, v] of hits) if (!v.some(t => now - t < 3600e3)) hits.delete(key);
+  return list.length >= max;
+}
+const hit = (kind, ip) => { const k = kind + "|" + ip; (hits.get(k) || hits.set(k, []).get(k)).push(Date.now()); };
+async function handleSub(req, res) {
+  const ip = clientIp(req);
+  if (tooMany("sub", ip, 30, 60e3)) return sendJson(res, 429, {error: "Masyadong maraming subok. Maghintay ng isang minuto."});
+  hit("sub", ip);
+  const raw = String(req.headers["x-sub-code"] || "");
+  return sendJson(res, 200, {enabled: SUB_ON, info: SUB_INFO, free: FREE_PER_DAY, check: SUB_ON && raw ? checkCode(raw) : null, quota: publicQuota(quotaOf(req))});
+}
+async function handleAdminCode(req, res) {
+  if (req.method !== "POST") return sendJson(res, 405, {error: "POST lang"});
+  if (!SUB_ON || ADMIN_PASSWORD.length < 8) return sendJson(res, 503, {error: "Hindi pa naka-setup: kailangan ang SUB_SECRET (16+ letra) at ADMIN_PASSWORD (8+ letra) sa .env o sa Render."});
+  const ip = clientIp(req);
+  if (tooMany("adminfail", ip, 5, 15 * 60e3)) return sendJson(res, 429, {error: "Maraming maling password. Subukan ulit pagkalipas ng 15 minuto."});
+  let q;
+  try { q = JSON.parse(await readBody(req, 2048)); } catch (e) { return sendJson(res, 400, {error: "Maling request"}); }
+  const h = v => crypto.createHash("sha256").update(String(v || "")).digest();
+  if (!crypto.timingSafeEqual(h(q.password), h(ADMIN_PASSWORD))) { hit("adminfail", ip); return sendJson(res, 401, {error: "Mali ang password."}); }
+  let lastDay;
+  if (typeof q.until === "string" && /^\d{4}-\d{2}-\d{2}$/.test(q.until)) {
+    const t = Date.parse(q.until + "T00:00:00Z"); lastDay = Number.isFinite(t) ? Math.floor((t - DAY0) / 864e5) : NaN;
+  } else {
+    const days = Number(q.days); lastDay = Number.isInteger(days) && days >= 1 && days <= 3660 ? phDay() + days - 1 : NaN;
+  }
+  if (!Number.isInteger(lastDay) || lastDay < phDay() || lastDay > 65535) return sendJson(res, 400, {error: "Maling haba o petsa ng subscription."});
+  const count = Math.min(20, Math.max(1, Number(q.count) | 0 || 1));
+  return sendJson(res, 200, {codes: Array.from({length: count}, () => makeCode(lastDay))});
+}
+
 // Mga error na pansamantala lang (abala o down ang model): pwedeng subukan ang fallback model.
 const RETRYABLE = new Set([500, 502, 503, 504]);
 const aiErr = (msg, status, retry) => Object.assign(new Error(msg), {status, retry: !!retry});
@@ -274,23 +405,29 @@ async function handleAi(req, res) {
     // New version for this reader only: always asks the AI, counts toward the limits, and does not replace the shared cache.
     let prev = typeof q.prev === "string" ? q.prev.slice(0, 12000) : "";
     if (!prev || !(issued.has(textHash(prev)) || (aiCache[key] && aiCache[key].text === prev))) prev = aiCache[key] ? aiCache[key].text : "";
+    const qt = quotaOf(req);
+    if (!quotaOk(qt)) return quotaRefusal(res, qt);
     const why = allow(clientIp(req));
     if (why) return sendJson(res, 429, {error: why});
     const tl = lang === "tl";
     const prompt = `Passage: ${refOf(p, VERS[p.ver].tl)} (${VERS[p.ver].name})\n\n${p.lines.join("\n")}\n\n${LANG[lang]}\n\n${TASK[mode](tl)}` +
       (prev ? `\n\nThe reader did not like this earlier answer:\n<<<\n${prev}\n>>>` : "") + `\n\n${AGAIN[again]}`;
-    try { const text = await callGemini(prompt, AGAIN_TEMP[again]); remember(text); return sendJson(res, 200, {text, again}); }
+    try { const text = await callGemini(prompt, AGAIN_TEMP[again]); remember(text); charge(qt); return sendJson(res, 200, {text, again, quota: publicQuota(qt)}); }
     catch (e) { return sendJson(res, e.status || 500, {error: e.message || "May error ang AI."}); }
   }
-  if (aiCache[key]) return sendJson(res, 200, {text: aiCache[key].text, cached: true});
+  // Answers already made (cache) are free; only a new answer counts toward the free / subscription limit.
+  if (aiCache[key]) return sendJson(res, 200, {text: aiCache[key].text, cached: true, quota: publicQuota(quotaOf(req))});
+  const qt = quotaOf(req); let mine = false;
   if (!pending.has(key)) {
+    if (!quotaOk(qt)) return quotaRefusal(res, qt);
+    mine = true;
     const why = allow(clientIp(req));
     if (why) return sendJson(res, 429, {error: why});
     const tl = lang === "tl";
     const prompt = `Passage: ${refOf(p, VERS[p.ver].tl)} (${VERS[p.ver].name})\n\n${p.lines.join("\n")}\n\n${LANG[lang]}\n\n${TASK[mode](tl)}`;
     pending.set(key, callGemini(prompt).then(text => { aiCache[key] = {text, ts: Date.now()}; saveCache(); return text; }).finally(() => pending.delete(key)));
   }
-  try { sendJson(res, 200, {text: await pending.get(key)}); }
+  try { const text = await pending.get(key); if (mine) charge(qt); sendJson(res, 200, {text, quota: publicQuota(qt)}); }
   catch (e) { sendJson(res, e.status || 500, {error: e.message || "May error ang AI."}); }
 }
 
@@ -333,6 +470,8 @@ async function handleChat(req, res) {
   const key = [mode, lang, p.ver, p.b, p.c, p.verses.join(",")].join("|");
   let answer = typeof q.answer === "string" ? q.answer.slice(0, 12000) : "";
   if (!answer || !(issued.has(textHash(answer)) || (aiCache[key] && aiCache[key].text === answer))) answer = aiCache[key] ? aiCache[key].text : "";
+  const qt = quotaOf(req);
+  if (!quotaOk(qt)) return quotaRefusal(res, qt);
   const why = allow(clientIp(req));
   if (why) return sendJson(res, 429, {error: why});
   const tl = lang === "tl";
@@ -345,7 +484,7 @@ async function handleChat(req, res) {
     contents.push({role: "model", parts: [{text: t.a}]});
   });
   contents.push({role: "user", parts: [{text: (turns.length ? "<<<\n" : context + "\n\nMember's question:\n<<<\n") + question + "\n>>>"}]});
-  try { const text = await callGemini(contents, 0.6, SYSTEM + CHAT_RULES); return sendJson(res, 200, {text}); }
+  try { const text = await callGemini(contents, 0.6, SYSTEM + CHAT_RULES); charge(qt); return sendJson(res, 200, {text, quota: publicQuota(qt)}); }
   catch (e) { return sendJson(res, e.status || 500, {error: e.message || "May error ang AI."}); }
 }
 
@@ -400,7 +539,9 @@ http.createServer((req, res) => {
   if (p === "/api/ai") return handleAi(req, res).catch(e => sendJson(res, 500, {error: "May error sa server."}));
   if (p === "/api/chat") return handleChat(req, res).catch(e => sendJson(res, 500, {error: "May error sa server."}));
   if (p === "/api/commentary") return handleCommentary(req, res, url).catch(e => sendJson(res, 500, {error: "May error sa server."}));
-  if (p === "/api/status") return sendJson(res, 200, {ai: !!AI_KEY, publicUrl: PUBLIC_URL});
+  if (p === "/api/status") return sendJson(res, 200, {ai: !!AI_KEY, publicUrl: PUBLIC_URL, sub: {enabled: SUB_ON, info: SUB_INFO, free: FREE_PER_DAY}});
+  if (p === "/api/sub") return handleSub(req, res).catch(e => sendJson(res, 500, {error: "May error sa server."}));
+  if (p === "/api/admin/code") return handleAdminCode(req, res).catch(e => sendJson(res, 500, {error: "May error sa server."}));
   if (p === "/api/ip") return DEBUG_IP ? sendJson(res, 200, ipReport(req)) : sendJson(res, 404, {error: "Hindi makita"});
   if (p.endsWith("/")) p += "index.html";
   const file = path.normalize(path.join(ROOT, p));
@@ -441,6 +582,7 @@ http.createServer((req, res) => {
       if (PUBLIC_URL) console.log("\n  I-scan para i-install ang app (kailangan ng internet):\n" + qrTerminal(PUBLIC_URL).replace(/^/gm, "  "));
     } catch (e) { /* QR is optional */ }
   }
-  console.log("\n  AI (Paliwanag/Sermon): " + (AI_KEY ? "ON (" + AI_MODEL + ", limit " + AI_DAILY_LIMIT + "/araw)" : "OFF - walang GEMINI_API_KEY sa .env (tingnan ang PAANO-GAMITIN.txt)"));
+  console.log("\n  Subscription (AI): " + (SUB_ON ? "ON (" + FREE_PER_DAY + " libre bawat phone bawat araw, " + SUB_PER_CODE + " bawat code)" + (ADMIN_PASSWORD.length >= 8 ? "" : " - walang ADMIN_PASSWORD, hindi magagamit ang admin page") : "OFF (walang tamang SUB_SECRET sa .env: libre ang AI)"));
+  console.log("  AI (Paliwanag/Sermon): " + (AI_KEY ? "ON (" + AI_MODEL + ", limit " + AI_DAILY_LIMIT + "/araw)" : "OFF - walang GEMINI_API_KEY sa .env (tingnan ang PAANO-GAMITIN.txt)"));
   console.log("\n  Isara ang window na ito para ihinto.\n");
 }).on("error", e => { console.error(e.code === "EADDRINUSE" ? "Gamit na ang port " + PORT + ". Subukan: set PORT=8081 && node server.js" : e.message); process.exit(1); });

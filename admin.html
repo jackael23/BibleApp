@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="tl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin · Subscription</title>
+<!-- 2026-11-21: Gumagawa ng subscription code para sa AI. Ang password ay ADMIN_PASSWORD sa .env / Render.
+     Walang listahan ng code sa server: ang listahan sa ibaba ay naka-save lang sa browser na ito. -->
+<style>
+:root{--paper:#f2ede3;--surface:#f8f5ee;--ink:#26211c;--muted:#786d60;--line:#ddd3c2;--accent:#9a2a1f;--accent-ink:#fbf7ef;--soft:#ece3d3;color-scheme:light dark}
+@media (prefers-color-scheme: dark){:root{--paper:#1b1613;--surface:#231d19;--ink:#ebe2d3;--muted:#a39684;--line:#3a3029;--accent:#e08a72;--accent-ink:#1b1613;--soft:#33281f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:720px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:22px;margin:0 0 4px}
+p{margin:0 0 12px}
+.muted{color:var(--muted);font-size:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;margin:16px 0;display:grid;gap:12px}
+label{display:grid;gap:4px;font-size:14px;color:var(--muted)}
+input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:9px 10px;width:100%}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:520px){.row{grid-template-columns:1fr}}
+button{font:inherit;font-weight:600;border:0;border-radius:4px;padding:10px 16px;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+button.ghost{background:var(--soft);color:var(--ink)}
+button.small{padding:6px 10px;font-size:14px}
+.err{color:#b5483b;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+td.code{font-family:ui-monospace,Consolas,monospace;font-size:15px;white-space:nowrap}
+.tablewrap{overflow-x:auto}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <h1>Subscription code (AI)</h1>
+  <p class="muted">Gumawa ng code para sa member na nagbayad. Ilalagay niya ito sa app: Ayos › Subscription (AI).</p>
+
+  <form class="card" id="form">
+    <label>Admin password<input type="password" id="pw" autocomplete="current-password" required></label>
+    <div class="row">
+      <label>Haba
+        <select id="len">
+          <option value="31">1 buwan (31 araw)</option>
+          <option value="92">3 buwan</option>
+          <option value="183">6 na buwan</option>
+          <option value="366">1 taon</option>
+          <option value="1827">5 taon (pastor / leader)</option>
+          <option value="date">Hanggang petsa…</option>
+        </select>
+      </label>
+      <label id="untilWrap" hidden>Huling araw na gagana<input type="date" id="until"></label>
+      <label>Ilang code<input type="number" id="count" min="1" max="20" value="1"></label>
+    </div>
+    <label>Note (para sa iyo lang, hal. pangalan ng member at petsa ng bayad)<input type="text" id="note" maxlength="80"></label>
+    <div><button type="submit" id="go">Gumawa ng code</button></div>
+    <p class="err" id="err" hidden></p>
+  </form>
+
+  <div class="card" id="newCard" hidden>
+    <strong>Bagong code</strong>
+    <div class="tablewrap"><table><tbody id="newRows"></tbody></table></div>
+    <p class="muted">Kopyahin at ibigay sa member. Hindi na ito maipapakita ulit ng server (pero nasa listahan sa ibaba sa browser na ito).</p>
+  </div>
+
+  <div class="card">
+    <strong>Mga nagawang code (sa browser na ito lang)</strong>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Code</th><th>ID</th><th>Hanggang</th><th>Note</th><th></th></tr></thead>
+      <tbody id="histRows"></tbody>
+    </table></div>
+    <p class="muted" id="histEmpty">Wala pa.</p>
+    <p class="muted"><b>Para ihinto ang isang code</b> bago matapos: idagdag ang <b>ID</b> nito sa <code>SUB_REVOKED</code> sa .env o sa Render (pinaghihiwalay ng kuwit), tapos i-restart / i-deploy.</p>
+    <div><button type="button" class="ghost small" id="clearHist">Burahin ang listahan sa browser na ito</button></div>
+  </div>
+</main>
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const KEY="bib.admin.codes";
+const load=()=>{try{const v=JSON.parse(localStorage.getItem(KEY)||"[]");return Array.isArray(v)?v:[]}catch(e){return []}};
+const save=v=>{try{localStorage.setItem(KEY,JSON.stringify(v.slice(0,500)))}catch(e){}};
+function copy(text,btn){
+  const done=()=>{const t=btn.textContent;btn.textContent="Nakopya ✓";setTimeout(()=>btn.textContent=t,1500)};
+  if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(text).then(done,()=>prompt("Kopyahin:",text));
+  else prompt("Kopyahin:",text);
+}
+function row(c,withNote){
+  return `<tr><td class="code">${esc(c.code)}</td><td>${esc(c.id)}</td><td>${esc(c.until)}</td>${withNote?`<td>${esc(c.note||"")}</td>`:""}<td><button type="button" class="ghost small" data-copy="${esc(c.code)}">Kopyahin</button></td></tr>`;
+}
+function renderHist(){
+  const h=load(); $("#histRows").innerHTML=h.map(c=>row(c,true)).join(""); $("#histEmpty").hidden=!!h.length;
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-copy]");if(b)copy(b.dataset.copy,b)});
+$("#len").addEventListener("change",()=>{$("#untilWrap").hidden=$("#len").value!=="date"});
+$("#clearHist").addEventListener("click",()=>{if(confirm("Burahin ang listahan sa browser na ito? Hindi nito pinapatay ang mga code.")){save([]);renderHist()}});
+$("#form").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const err=$("#err"); err.hidden=true;
+  const body={password:$("#pw").value,count:Number($("#count").value)||1};
+  if($("#len").value==="date"){ if(!$("#until").value){err.textContent="Pumili ng petsa.";err.hidden=false;return} body.until=$("#until").value; }
+  else body.days=Number($("#len").value);
+  $("#go").disabled=true;
+  try{
+    const r=await fetch("api/admin/code",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const j=await r.json().catch(()=>({error:"Walang sagot ang server."}));
+    if(!r.ok){err.textContent=j.error||"May error.";err.hidden=false;return}
+    const note=$("#note").value.trim(), made=new Date().toISOString().slice(0,10);
+    const codes=j.codes.map(c=>({...c,note,made}));
+    $("#newRows").innerHTML=codes.map(c=>row(c,false)).join(""); $("#newCard").hidden=false;
+    save([...codes,...load()]); renderHist(); $("#note").value="";
+  }catch(ex){err.textContent="Hindi maabot ang server.";err.hidden=false}
+  finally{$("#go").disabled=false}
+});
+renderHist();
+</script>
+</body>
+</html>
