@@ -88,3 +88,10 @@ PANGALAN AT LOGO NG SIMBAHAN - idinagdag 2026-11-21
 - Pagkatapos baguhin: i-push sa GitHub at i-deploy ulit. Hindi na kailangang palitan ang VERSION sa sw.js.
 - Kapag binura ang church.json, babalik sa "Bibliya ng Iglesia".
 - Hindi nito binabago ang icon ng app sa home screen at ang pangalan sa APK.
+
+PAALALA ARAW-ARAW - idinagdag 2026-11-21
+- Sa Ngayon, sa card ng reading plan, pindutin ang "Paalala". Pumili ng oras.
+- Android: "Google Calendar" > Save. iPhone: "I-download (.ics)" > Add All.
+- Ang calendar ng phone ang magpapaalala araw-araw (kahit nakasara ang app at walang internet).
+  Pagpindot sa link sa event, bubukas ang app sa babasahin ngayon.
+- Para itigil: buksan ang event sa calendar at burahin ang lahat ng susunod.
