@@ -15,7 +15,7 @@ try {
 
 const PORT = Number(process.env.PORT) || 8080;
 const TYPES = {".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".json":"application/json; charset=utf-8",
-  ".webmanifest":"application/manifest+json",".png":"image/png",".woff2":"font/woff2",".txt":"text/plain; charset=utf-8"};
+  ".webmanifest":"application/manifest+json",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp",".woff2":"font/woff2",".txt":"text/plain; charset=utf-8"};
 const GZ = new Set([".html",".js",".json",".webmanifest",".txt"]);
 const gzCache = new Map();
 const BLOCK = new Set(["server.js","start-bible.cmd","ai-cache.json","download-commentary.js","download-commentary.cmd","package.json","package-lock.json"]);

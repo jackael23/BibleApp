@@ -66,3 +66,15 @@ TALATA BILANG LARAWAN - idinagdag 2026-11-21
 - "Ibahagi" = diretso sa FB, Messenger, atbp. (sa naka-host na https lang lumalabas ito).
   "I-save" = mada-download ang larawan (PNG).
 - Hanggang mga 6 na talata lang ang kasya sa isang larawan.
+
+PANGALAN AT LOGO NG SIMBAHAN - idinagdag 2026-11-21
+- Nasa file na  church.json  (buksan sa Notepad):
+    "name"    = pangalan ng simbahan (hal. The Life of Truth Church)
+    "tagline" = opsyonal, hal. oras ng service o address ("" kapag wala)
+    "logo"    = "church/logo.png" (PNG, JPG o WEBP sa loob ng folder na church)
+- Para palitan ang logo: ilagay ang bagong larawan sa folder na church, square ang hugis
+  (mga 256x256 o 512x512), tapos i-save bilang  church/logo.png  (o palitan ang "logo" sa church.json).
+- Lumalabas sa itaas ng "Ngayon", sa ibaba ng larawan ng talata, at sa title ng page.
+- Pagkatapos baguhin: i-push sa GitHub at i-deploy ulit. Hindi na kailangang palitan ang VERSION sa sw.js.
+- Kapag binura ang church.json, babalik sa "Bibliya ng Iglesia".
+- Hindi nito binabago ang icon ng app sa home screen at ang pangalan sa APK.
