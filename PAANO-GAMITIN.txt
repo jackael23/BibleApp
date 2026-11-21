@@ -38,6 +38,9 @@ PALIWANAG AT SERMON (AI) - idinagdag 2026-11-19
 - Sa Basahin, pindutin ang isa o ilang talata. Sa ibaba, piliin ang "Ipaliwanag" o "Gawan ng sermon".
 - Pwedeng palitan ang Tagalog/English, at may "Matthew Henry" (lumang komentaryo, English, libre).
 - Gawa ng AI ang sagot kaya pwedeng magkamali: ikumpara sa Bibliya at itanong sa pastor.
+- (2026-11-21) Hindi nagustuhan ang sagot? Pindutin ang "Bagong paliwanag" (o "Bagong sermon")
+  at pumili: Iba lang, Mas simple, Mas maikli, o Mas malalim. Bawat isa ay bilang sa limit ng AI.
+  Para sa iyo lang ang bagong bersyon; i-save sa notes kung gusto mong itago.
 
 PAANO I-SETUP ANG AI (isang beses lang, sa PC)
 1. Kumuha ng libreng Gemini API key: https://aistudio.google.com/apikey

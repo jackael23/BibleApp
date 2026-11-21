@@ -184,17 +184,34 @@ Keep it around 350 to 550 words.`,
 Keep it around 700 to 1000 words.`
 };
 
+// 2026-11-21: "Bagong paliwanag / sermon" kapag hindi nagustuhan ang sagot. Ipinapasa ang naunang sagot para iba talaga ang lumabas.
+const AGAIN = {
+  other: `Write a NEW answer that takes a clearly different approach: a different angle, different wording, different examples, and different related passages where it fits. Do not repeat sentences from the earlier answer. Keep the same sections and about the same length.`,
+  simpler: `Write it again in much simpler words, for a new believer or a teenager: short sentences, no theological jargon (or explain it in plain words), everyday examples. Keep the same sections and about the same length or shorter.`,
+  shorter: `Write a much shorter version, about half the length of the earlier answer. Keep the same sections but only the most important points. This overrides the length given above.`,
+  deeper: `Go deeper than the earlier answer: more on the historical and literary context, the meaning of key words (mention original-language words only if you are sure), how the passage fits the whole Bible story, and more related passages. Stay faithful and humble about debated points. It may be up to 30% longer. This overrides the length given above.`
+};
+const AGAIN_TEMP = {other: 0.9, simpler: 0.7, shorter: 0.6, deeper: 0.7};
+// The earlier answer is only accepted when this server produced it (hash), so the request cannot smuggle in its own instructions.
+const crypto = require("crypto");
+const issued = new Map(); // sha256(text) -> time
+const textHash = t => crypto.createHash("sha256").update(String(t)).digest("hex");
+function remember(text) {
+  issued.set(textHash(text), Date.now());
+  if (issued.size > 3000) { const old = [...issued].sort((a, b) => a[1] - b[1]).slice(0, issued.size - 3000); for (const [k] of old) issued.delete(k); }
+}
+
 // Mga error na pansamantala lang (abala o down ang model): pwedeng subukan ang fallback model.
 const RETRYABLE = new Set([500, 502, 503, 504]);
 const aiErr = (msg, status, retry) => Object.assign(new Error(msg), {status, retry: !!retry});
 
-async function callModel(model, prompt, ms) {
+async function callModel(model, prompt, ms, temperature) {
   const url = AI_BASE + "/models/" + encodeURIComponent(model) + ":generateContent";
   let r;
   try {
     r = await fetch(url, {method: "POST", signal: AbortSignal.timeout(ms),
       headers: {"Content-Type": "application/json", "x-goog-api-key": AI_KEY},
-      body: JSON.stringify({systemInstruction: {parts: [{text: SYSTEM}]}, contents: [{role: "user", parts: [{text: prompt}]}], generationConfig: {temperature: 0.5}})});
+      body: JSON.stringify({systemInstruction: {parts: [{text: SYSTEM}]}, contents: [{role: "user", parts: [{text: prompt}]}], generationConfig: {temperature: temperature || 0.5}})});
   } catch (e) {
     const timedOut = e && (e.name === "TimeoutError" || e.name === "AbortError");
     console.error("  [AI] " + model + ": " + (timedOut ? "timeout pagkalipas ng " + Math.round(ms / 1000) + "s" : "hindi maabot (" + (e && e.message) + ")"));
@@ -217,7 +234,7 @@ async function callModel(model, prompt, ms) {
   return text;
 }
 
-async function callGemini(prompt) {
+async function callGemini(prompt, temperature) {
   if (typeof fetch !== "function") throw aiErr("Luma ang Node.js sa PC. Kailangan ng Node 18 o mas bago para sa AI.", 500);
   const end = Date.now() + AI_DEADLINE;
   let first;
@@ -225,7 +242,7 @@ async function callGemini(prompt) {
     const left = end - Date.now();
     if (i > 0 && left < 5000) break;               // kulang na ang oras para sa isa pang subok
     try {
-      const text = await callModel(model, prompt, Math.min(AI_TIMEOUT, left));
+      const text = await callModel(model, prompt, Math.min(AI_TIMEOUT, left), temperature);
       if (i > 0) console.log("  [AI] ginamit ang fallback model: " + model);
       return text;
     } catch (e) {
@@ -243,13 +260,26 @@ async function handleAi(req, res) {
   if (req.method !== "POST") return sendJson(res, 405, {error: "POST lang"});
   if (!AI_KEY) return sendJson(res, 503, {error: "Hindi pa naka-setup ang AI sa server (walang GEMINI_API_KEY). Pwede munang gamitin ang Matthew Henry.", code: "nokey"});
   let q;
-  try { q = JSON.parse(await readBody(req, 4096)); } catch (e) { return sendJson(res, 400, {error: "Maling request"}); }
+  try { q = JSON.parse(await readBody(req, 32768)); } catch (e) { return sendJson(res, 400, {error: "Maling request"}); }
   const mode = q.mode === "sermon" ? "sermon" : q.mode === "explain" ? "explain" : "";
   const lang = q.lang === "en" ? "en" : q.lang === "tl" ? "tl" : "";
   let p;
   try { p = mode && lang && checkPassage(q, true); } catch (e) { p = null; }
   if (!p || !p.lines.length) return sendJson(res, 400, {error: "Hindi makilala ang napiling talata."});
   const key = [mode, lang, p.ver, p.b, p.c, p.verses.join(",")].join("|");
+  const again = Object.prototype.hasOwnProperty.call(AGAIN, q.again) ? q.again : "";
+  if (again) {
+    // New version for this reader only: always asks the AI, counts toward the limits, and does not replace the shared cache.
+    let prev = typeof q.prev === "string" ? q.prev.slice(0, 12000) : "";
+    if (!prev || !(issued.has(textHash(prev)) || (aiCache[key] && aiCache[key].text === prev))) prev = aiCache[key] ? aiCache[key].text : "";
+    const why = allow(clientIp(req));
+    if (why) return sendJson(res, 429, {error: why});
+    const tl = lang === "tl";
+    const prompt = `Passage: ${refOf(p, VERS[p.ver].tl)} (${VERS[p.ver].name})\n\n${p.lines.join("\n")}\n\n${LANG[lang]}\n\n${TASK[mode](tl)}` +
+      (prev ? `\n\nThe reader did not like this earlier answer:\n<<<\n${prev}\n>>>` : "") + `\n\n${AGAIN[again]}`;
+    try { const text = await callGemini(prompt, AGAIN_TEMP[again]); remember(text); return sendJson(res, 200, {text, again}); }
+    catch (e) { return sendJson(res, e.status || 500, {error: e.message || "May error ang AI."}); }
+  }
   if (aiCache[key]) return sendJson(res, 200, {text: aiCache[key].text, cached: true});
   if (!pending.has(key)) {
     const why = allow(clientIp(req));
