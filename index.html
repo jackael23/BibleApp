@@ -292,6 +292,16 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
 .imgopts .seg{width:100%}
 .imgopts .seg button{flex:1}
 </style>
+<style id="church-brand">
+/* 2026-11-21 — Pangalan at logo ng simbahan (church.json) sa itaas ng Ngayon */
+.churchhead{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding-bottom:12px;border-bottom:3px double var(--gilt,var(--line))}
+.churchhead[hidden]{display:none}
+.churchhead img{width:56px;height:56px;border-radius:50%;object-fit:cover;flex:none}
+.churchhead img[hidden]{display:none}
+.churchhead .cname{font-family:var(--font-display);font-weight:700;font-size:22px;line-height:1.2;overflow-wrap:anywhere}
+.churchhead .ctag{font-size:14px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.churchhead .ctag:empty{display:none}
+</style>
 </head>
 <body>
 <div class="app">
@@ -305,6 +315,7 @@ textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var
   <main class="main" id="main">
     <!-- HOME -->
     <section class="view" id="v-ngayon" aria-label="Ngayon">
+      <div class="churchhead" id="churchHead" hidden><img id="churchLogo" alt="" hidden><div style="min-width:0"><div class="cname" id="churchName"></div><div class="ctag" id="churchTag"></div></div></div>
       <div class="date" id="today"></div>
       <div class="stack">
         <article class="votd" aria-labelledby="votdLabel">
@@ -1136,13 +1147,21 @@ function drawVerseImage(cv,ctx,size,theme){
   g.fillStyle=T.ref; g.font=`700 ${refFont}px "Gentium Book Plus", Georgia, serif`;
   g.fillText(ctx.ref,cx,y); y+=refFont+40;
   rule(g,cx,y+10,T.rule);
-  g.fillStyle=T.foot; g.font=`600 ${size==="story"?28:24}px Figtree, system-ui, sans-serif`;
-  g.fillText("Bibliya ng Iglesia",cx,H-(size==="story"?170:112));
+  // Footer: church logo + name (church.json), or "Bibliya ng Iglesia" when none is set.
+  const fy=H-(size==="story"?170:112), fsz=size==="story"?28:24, logo=CHURCH.img, ls=size==="story"?64:56;
+  g.fillStyle=T.foot; g.font=`600 ${fsz}px Figtree, system-ui, sans-serif`;
+  let label=churchName(); while(label.length>3&&g.measureText(label).width>W-pad*2-ls-16) label=label.slice(0,-2).trimEnd()+"…";
+  if(logo){
+    const tw=g.measureText(label).width, x0=cx-(ls+14+tw)/2, ly=fy+fsz/2-ls/2;
+    g.save(); g.beginPath(); g.arc(x0+ls/2,ly+ls/2,ls/2,0,Math.PI*2); g.clip(); g.drawImage(logo,x0,ly,ls,ls); g.restore();
+    g.textAlign="left"; g.fillText(label,x0+ls+14,fy); g.textAlign="center";
+  }else g.fillText(label,cx,fy);
 }
 async function renderImg(){
   const seq=++IMG.seq; IMG.blob=null;
   syncSeg("#imgSizeSeg","size",S.imgSize); syncSeg("#imgThemeSeg","th",S.imgTheme);
   try{await Promise.all(['400 40px "Gentium Book Plus"','700 40px "Gentium Book Plus"','600 24px Figtree'].map(f=>document.fonts.load(f)))}catch(e){}
+  await CHURCH.ready;
   if(seq!==IMG.seq) return;
   const cv=$("#imgCanvas"); drawVerseImage(cv,IMG.ctx,S.imgSize,S.imgTheme);
   cv.toBlob(b=>{if(seq===IMG.seq) IMG.blob=b},"image/png");
@@ -1184,6 +1203,36 @@ $("#actImg").addEventListener("click",()=>{
 $("#votdImg").addEventListener("click",()=>{
   const [b,c,v,w]=votdToday(); const data=DATA[S.ver]; if(!data) return;
   openImage(verseText(data,b,c,v,w),refStr(b,c,v,w)+" · "+VERS[S.ver].name);
+});
+
+/* ---------- pangalan at logo ng simbahan (2026-11-21) ---------- */
+// church.json (set by the admin, same for every member): {"name","tagline","logo":"church/<file>.png|jpg|webp"}.
+// Last good copy is kept in localStorage so the header shows at once and offline.
+const CHURCH={name:"",tagline:"",logo:"",img:null,ready:Promise.resolve()};
+function cleanChurch(j){
+  if(!j||typeof j!=="object") return null;
+  const str=(v,max)=>typeof v==="string"?v.replace(/\s+/g," ").trim().slice(0,max):"";
+  const name=str(j.name,80); if(!name) return null;
+  const logo=typeof j.logo==="string"&&/^church\/[\w.-]+\.(png|jpe?g|webp)$/i.test(j.logo)?j.logo:"";
+  return {name,tagline:str(j.tagline,100),logo};
+}
+function churchName(){return CHURCH.name||"Bibliya ng Iglesia"}
+function applyChurch(c){
+  CHURCH.name=c?c.name:""; CHURCH.tagline=c?c.tagline:"";
+  if((c?c.logo:"")!==CHURCH.logo){
+    CHURCH.logo=c?c.logo:""; CHURCH.img=null;
+    CHURCH.ready=CHURCH.logo?new Promise(res=>{const im=new Image();im.onload=()=>{CHURCH.img=im;res()};im.onerror=()=>res();im.src=CHURCH.logo}):Promise.resolve();
+  }
+  $("#churchHead").hidden=!c;
+  $("#churchName").textContent=CHURCH.name; $("#churchTag").textContent=CHURCH.tagline;
+  const lg=$("#churchLogo"); lg.hidden=!CHURCH.logo; if(CHURCH.logo){lg.src=CHURCH.logo;lg.alt="Logo ng "+CHURCH.name} else lg.removeAttribute("src");
+  document.title=c?CHURCH.name+" · Bibliya":"Bibliya ng Iglesia";
+}
+$("#churchLogo").addEventListener("error",()=>{$("#churchLogo").hidden=true});
+applyChurch(cleanChurch(store.get("church",null)));
+fetch("church.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null).catch(()=>undefined).then(j=>{
+  if(j===undefined) return; // offline / network error: keep the last good copy
+  const c=cleanChurch(j); store.set("church",c); applyChurch(c);
 });
 
 /* ---------- settings ---------- */
