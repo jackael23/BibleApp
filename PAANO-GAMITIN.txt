@@ -69,7 +69,7 @@ TALATA BILANG LARAWAN - idinagdag 2026-11-21
 
 PANGALAN AT LOGO NG SIMBAHAN - idinagdag 2026-11-21
 - Nasa file na  church.json  (buksan sa Notepad):
-    "name"    = pangalan ng simbahan (hal. TLOTC)
+    "name"    = pangalan ng simbahan (hal. The Life of Truth Church)
     "tagline" = opsyonal, hal. oras ng service o address ("" kapag wala)
     "logo"    = "church/logo.png" (PNG, JPG o WEBP sa loob ng folder na church)
 - Para palitan ang logo: ilagay ang bagong larawan sa folder na church, square ang hugis
